@@ -1,3 +1,4 @@
+import { BotLog } from '#/engine/bot/BotLog.js';
 import Player, { getExpByLevel } from '#/engine/entity/Player.js';
 import ObjType from '#/cache/config/ObjType.js';
 import {
@@ -484,7 +485,7 @@ export class EdgevillePKerTask extends BotTask {
         const [wx, wz] = this.getWildernessSpot(player);
         this.wildTargetX = wx;
         this.wildTargetZ = wz;
-        console.log(`[EdgevillePKer] ${player.displayName} profile=${p.name} cb=${player.combatLevel} spot=${wx},${wz}`);
+        BotLog.debug(`[EdgevillePKer] ${player.displayName} profile=${p.name} cb=${player.combatLevel} spot=${wx},${wz}`);
         this.state = 'walk_to_wild';
         this.cooldown = randInt(2, 4);
         teleportNear(player, EDGEVILLE_CENTER[0], EDGEVILLE_CENTER[1]);

@@ -14,6 +14,7 @@
  *   reset the obstacle index and walk back to the course.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask, Player,
     walkTo, interactLocOp, findLocByName,
@@ -101,7 +102,7 @@ export class AgilityTask extends BotTask {
         const newStep = getProgressionStep('AGILITY', level);
 
         if (newStep && newStep.minLevel > this.step.minLevel) {
-            console.log(`[Agility] 📈 Upgrading course (now level ${level})`);
+            BotLog.debug(`[Agility] 📈 Upgrading course (now level ${level})`);
             this.step          = newStep;
             this.obstacleIndex = 0;
             this.state         = 'walk';
@@ -140,7 +141,7 @@ export class AgilityTask extends BotTask {
                 return;
             }
 
-            console.log(`[Agility] 🏃 Arrived at course`);
+            BotLog.debug(`[Agility] 🏃 Arrived at course`);
             this.obstacleIndex = 0;
             this.state         = this._needsBarbarianEntryPipe(player) ? 'entry_pipe' : 'obstacle';
             return;
@@ -177,7 +178,7 @@ export class AgilityTask extends BotTask {
             const obstacles = AgilityCourses[courseKey];
 
             if (!obstacles || obstacles.length === 0) {
-                console.log(`[Agility] ❌ No obstacles defined for course: ${courseKey}`);
+                BotLog.debug(`[Agility] ❌ No obstacles defined for course: ${courseKey}`);
                 this.interrupt();
                 return;
             }
@@ -185,7 +186,7 @@ export class AgilityTask extends BotTask {
             if (this.obstacleIndex >= obstacles.length) {
                 // Completed a full lap — restart from the first obstacle
                 this.obstacleIndex = 0;
-                console.log(`[Agility] 🏁 Lap complete, restarting`);
+                BotLog.debug(`[Agility] 🏁 Lap complete, restarting`);
             }
 
             const obstacle = obstacles[this.obstacleIndex];
@@ -261,7 +262,7 @@ export class AgilityTask extends BotTask {
                 const obstacle = obstacles[this.obstacleIndex];
 
                 if (courseKey === 'BARBARIAN' && obstacle?.name === 'barbarian_ledge' && levelChanged && player.level === 0) {
-                    console.log('[Agility] Barbarian ledge failed; continuing from crumbling walls');
+                    BotLog.debug('[Agility] Barbarian ledge failed; continuing from crumbling walls');
                     this.obstacleIndex = 5;
                     this.state = 'obstacle';
                     this.cooldown = randInt(1, 3);
@@ -271,14 +272,14 @@ export class AgilityTask extends BotTask {
                 this.obstacleIndex++;
 
                 const lapDone = this.obstacleIndex >= obstacles.length;
-                console.log(
+                BotLog.debug(
                     `[Agility] ⚡ Obstacle ${this.obstacleIndex}/${obstacles.length} done` +
                     (lapDone ? ' — lap complete!' : '')
                 );
 
                 if (lapDone) {
                     this.lapsCompleted++;
-                    console.log(`[Agility] 🏁 Lap ${this.lapsCompleted}/${AgilityTask.LAPS_PER_TASK} complete`);
+                    BotLog.debug(`[Agility] 🏁 Lap ${this.lapsCompleted}/${AgilityTask.LAPS_PER_TASK} complete`);
                     if (this.lapsCompleted >= AgilityTask.LAPS_PER_TASK) {
                         this.complete = true;
                         return;
@@ -299,7 +300,7 @@ export class AgilityTask extends BotTask {
 
             if (this.waitTicks >= AgilityTask.MAX_WAIT) {
                 // Timed out — obstacle likely failed; reset and re-navigate to course
-                console.log(`[Agility] ⚠️ Obstacle timeout — resetting lap`);
+                BotLog.debug(`[Agility] ⚠️ Obstacle timeout — resetting lap`);
                 this.obstacleIndex = 0;
                 this.waitTicks     = 0;
                 this.state         = 'walk';
@@ -336,7 +337,7 @@ export class AgilityTask extends BotTask {
         }
 
         if (this.stuck.desperatelyStuck) {
-            console.log(`[Agility] 🌀 Teleport escape`);
+            BotLog.debug(`[Agility] 🌀 Teleport escape`);
             teleportNear(player, x, z);
             this.stuck.reset();
             return;

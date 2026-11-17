@@ -6,6 +6,7 @@
  * announces what they're selling, and accepts player trades to sell them.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     interactIF_UseOp,
     interactIfButtonByName,
@@ -306,7 +307,7 @@ export class VendorTask extends BotTask {
             inv.add(pickedTradeId, this.itemCount);
         }
 
-        console.log(`[VendorTask] ${player.displayName} stocking ${this.itemCount}x ${this._stockOfferName(picked)} @ ${picked.priceEach}gp ea`);
+        BotLog.debug(`[VendorTask] ${player.displayName} stocking ${this.itemCount}x ${this._stockOfferName(picked)} @ ${picked.priceEach}gp ea`);
 
         this.state = 'walk';
         this.cooldown = randInt(2, 4);
@@ -709,7 +710,7 @@ export class VendorTask extends BotTask {
     }
 
     private _resetTrade(player: Player, reason?: string): void {
-        if (reason) console.log(`[VendorTask] Trade reset: ${reason}`);
+        if (reason) BotLog.debug(`[VendorTask] Trade reset: ${reason}`);
         player.botTradeTargetPid = -1;
         player.botTradeTargetStage = -1;
         player.botTradeTargetChatName = '';

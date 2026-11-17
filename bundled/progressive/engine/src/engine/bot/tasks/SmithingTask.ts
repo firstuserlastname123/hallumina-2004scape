@@ -8,6 +8,7 @@
  * Anvil mode uses bars from bank (bank smelted bars first, then use them on anvil).
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -70,7 +71,7 @@ export class SmithingTask extends BotTask {
     }
 
     private debug(player: Player, message: string): void {
-        console.log(`[SmithingTask][${player.username}][${this.state}] ${message}`);
+        BotLog.debug(`[SmithingTask][${player.username}][${this.state}] ${message}`);
     }
 
     // ── Task lifecycle ────────────────────────────────────────────────────────

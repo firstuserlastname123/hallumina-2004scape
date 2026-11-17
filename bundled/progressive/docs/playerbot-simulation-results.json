@@ -1,0 +1,800 @@
+{
+  "baselineCommit": "1df577575837b7fb07900bf84402a5921dbe2182",
+  "runtime": "Linux x86_64; Node 24.22.1",
+  "method": "Sequential, isolated SQLite, 100 bots, 6000 full world ticks per run; interval 0ms; first 20 ticks excluded from steady timing and action progression",
+  "validation": {
+    "botTestsPassed": 13,
+    "integrityTestsPassed": 5,
+    "unchangedTypeScriptErrors": 11
+  },
+  "runs": [
+    {
+      "seed": 254,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 106.73264346799999,
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 64712,
+        "stationaryOscillation": 54362,
+        "stuck": 0,
+        "timeoutMessages": 869,
+        "timeoutDiagnostics": 1986,
+        "missingSheepMessages": 1202,
+        "logLines": 146613,
+        "logBytes": 14519412,
+        "errors": 0,
+        "blockedStepsQueued": 53,
+        "noOpPathsQueued": 190
+      },
+      "eventCounts": null,
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 16.639891933166588,
+        "p95Ms": 23.775695000003907,
+        "p99Ms": 34.29453800000192,
+        "maxMs": 3788.2290159999993,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 4.8368772718332,
+        "p95Ms": 10.162490000002435,
+        "p99Ms": 14.359410999997635,
+        "maxMs": 86.50722999998834,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 15.940134865050089,
+        "p95Ms": 23.591062000006787,
+        "p99Ms": 33.328747999999905,
+        "maxMs": 241.02569499998935,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 4.803138583110237,
+        "p95Ms": 10.101089999996475,
+        "p99Ms": 14.341488999998546,
+        "maxMs": 86.50722999998834,
+        "over600ms": 0
+      },
+      "xpGained": 313425.50000000006,
+      "levelsGained": 638,
+      "botsWithXp": 64,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "stdoutLines": 146614,
+      "stdoutBytes": 14519467,
+      "version": "before",
+      "cohorts": {
+        "Skiller": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 29903.2,
+          "levelsGained": 208
+        },
+        "Fighter": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 14496.0,
+          "levelsGained": 99
+        },
+        "Balanced": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 25505.2,
+          "levelsGained": 179
+        },
+        "Random": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 20040.4,
+          "levelsGained": 152
+        },
+        "Extras-edgeville_pker": {
+          "bots": 12,
+          "botsWithXp": 12,
+          "earnedXp": 223480.7,
+          "levelsGained": 0
+        },
+        "Extras-vendor": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-pker": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-social": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        }
+      },
+      "progressionBotsWithXp": 52,
+      "progressionBotXp": 89944.8,
+      "rawSheepSearchFailures": 1202,
+      "rawReportSha256": "8b13f8a78b76d2a93c5ca425ceef567fc76f36a8425c2001600473756978ea6b",
+      "stdoutSha256": "fce90938c42bc7f02f385aad3591c26a138e699ac2c4324301b3312fcf5cf8ef",
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 56937.1,
+          "oscillationRecoveries": 10506,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 294
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 107424.8,
+          "oscillationRecoveries": 21093,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 695
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 155774.7,
+          "oscillationRecoveries": 32048,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1080
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 209470.7,
+          "oscillationRecoveries": 42711,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1341
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 258680.3,
+          "oscillationRecoveries": 53542,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1586
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 313425.5,
+          "oscillationRecoveries": 64712,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1986
+        }
+      ]
+    },
+    {
+      "seed": 254,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 115.52971977899999,
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 206,
+        "stationaryOscillation": 0,
+        "stuck": 566,
+        "timeoutMessages": 59,
+        "timeoutDiagnostics": 1498,
+        "missingSheepMessages": 54,
+        "logLines": 1322,
+        "logBytes": 175672,
+        "errors": 0,
+        "blockedStepsQueued": 48,
+        "noOpPathsQueued": 128
+      },
+      "eventCounts": {
+        "detail": 51515,
+        "startup": 1,
+        "path_failed": 553,
+        "patrol_found": 2206,
+        "xp_gain_random": 2264,
+        "gate_block_npc": 752,
+        "reengage": 1085,
+        "navigation_stuck": 566,
+        "target_unreachable": 792,
+        "gate_open_scan": 5997,
+        "npc_found": 14715,
+        "resource_missing": 182,
+        "task_deferred": 155,
+        "navigation_oscillation": 206,
+        "scan_fail": 983,
+        "summary": 60,
+        "no_progress": 13,
+        "timeouts": 1498,
+        "no_attack_timeout": 1406,
+        "loot_found": 1076,
+        "bury_bones": 167,
+        "bury_small": 203,
+        "bury_done": 164,
+        "watchdog": 364,
+        "flee_trigger": 456,
+        "flee_done": 408,
+        "shear_timeout": 2,
+        "inv_full": 12,
+        "level_up": 21
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 18.091831144666653,
+        "p95Ms": 24.424903999999515,
+        "p99Ms": 36.39987800000381,
+        "maxMs": 4117.435228,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 6.632509983833367,
+        "p95Ms": 12.572973000002094,
+        "p99Ms": 16.909583000000566,
+        "maxMs": 88.8235629999981,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 17.315283544147146,
+        "p95Ms": 24.304412000012235,
+        "p99Ms": 34.7639199999976,
+        "maxMs": 331.5859599999967,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 6.606300551672275,
+        "p95Ms": 12.513812999997754,
+        "p99Ms": 16.677565000005416,
+        "maxMs": 88.8235629999981,
+        "over600ms": 0
+      },
+      "xpGained": 277012.89999999997,
+      "levelsGained": 554,
+      "botsWithXp": 67,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "stdoutLines": 1323,
+      "stdoutBytes": 175726,
+      "version": "after",
+      "cohorts": {
+        "Skiller": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 22953.4,
+          "levelsGained": 176
+        },
+        "Fighter": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 13062.6,
+          "levelsGained": 88
+        },
+        "Balanced": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 20077.3,
+          "levelsGained": 151
+        },
+        "Random": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 17660.5,
+          "levelsGained": 139
+        },
+        "Extras-edgeville_pker": {
+          "bots": 12,
+          "botsWithXp": 12,
+          "earnedXp": 203253.1,
+          "levelsGained": 0
+        },
+        "Extras-vendor": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-pker": {
+          "bots": 12,
+          "botsWithXp": 3,
+          "earnedXp": 6,
+          "levelsGained": 0
+        },
+        "Extras-social": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        }
+      },
+      "progressionBotsWithXp": 52,
+      "progressionBotXp": 73753.8,
+      "rawSheepSearchFailures": 182,
+      "rawReportSha256": "6cc083e9b661d4b1ebcdf5492ca7937aa90a2d6ea6e69a52a3f5accd776ab3e4",
+      "stdoutSha256": "47b46ba8aa71c4e36e20e23fe4a2aa9e4c03271c523494df0ab40de9e6b45ec9",
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 47412.1,
+          "oscillationRecoveries": 30,
+          "walkingStuckRecoveries": 95,
+          "rawTimeoutDiagnostics": 250
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 93088.9,
+          "oscillationRecoveries": 88,
+          "walkingStuckRecoveries": 234,
+          "rawTimeoutDiagnostics": 520
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 135921.5,
+          "oscillationRecoveries": 108,
+          "walkingStuckRecoveries": 319,
+          "rawTimeoutDiagnostics": 789
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 183467.4,
+          "oscillationRecoveries": 131,
+          "walkingStuckRecoveries": 388,
+          "rawTimeoutDiagnostics": 1017
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 231222.5,
+          "oscillationRecoveries": 184,
+          "walkingStuckRecoveries": 483,
+          "rawTimeoutDiagnostics": 1259
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 277012.9,
+          "oscillationRecoveries": 206,
+          "walkingStuckRecoveries": 566,
+          "rawTimeoutDiagnostics": 1498
+        }
+      ]
+    },
+    {
+      "seed": 255,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 118.99734627299999,
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 65253,
+        "stationaryOscillation": 55752,
+        "stuck": 0,
+        "timeoutMessages": 894,
+        "timeoutDiagnostics": 1925,
+        "missingSheepMessages": 160,
+        "logLines": 153588,
+        "logBytes": 15543337,
+        "errors": 0,
+        "blockedStepsQueued": 51,
+        "noOpPathsQueued": 242
+      },
+      "eventCounts": null,
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 18.65818352783332,
+        "p95Ms": 27.353095999998914,
+        "p99Ms": 44.94129899999825,
+        "maxMs": 4136.9827430000005,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 5.6206319983332795,
+        "p95Ms": 11.983365000007325,
+        "p99Ms": 18.506508000002214,
+        "maxMs": 151.22400799999923,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 17.858851083444804,
+        "p95Ms": 27.179646000000503,
+        "p99Ms": 43.77030999999988,
+        "maxMs": 456.53242200000386,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 5.575701956688909,
+        "p95Ms": 11.878149000000121,
+        "p99Ms": 18.356983999998192,
+        "maxMs": 70.3331279999984,
+        "over600ms": 0
+      },
+      "xpGained": 219719.29999999996,
+      "levelsGained": 625,
+      "botsWithXp": 64,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "stdoutLines": 153589,
+      "stdoutBytes": 15543394,
+      "version": "before",
+      "cohorts": {
+        "Skiller": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 19760.1,
+          "levelsGained": 158
+        },
+        "Fighter": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 18827.8,
+          "levelsGained": 127
+        },
+        "Balanced": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 22305.4,
+          "levelsGained": 170
+        },
+        "Random": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 22470.3,
+          "levelsGained": 170
+        },
+        "Extras-edgeville_pker": {
+          "bots": 12,
+          "botsWithXp": 12,
+          "earnedXp": 136355.7,
+          "levelsGained": 0
+        },
+        "Extras-vendor": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-pker": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-social": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        }
+      },
+      "progressionBotsWithXp": 52,
+      "progressionBotXp": 83363.6,
+      "rawSheepSearchFailures": 160,
+      "rawReportSha256": "fce6c6802ac4599bf24e9ca7dd5249612ba1bcc6a84f4fb769b526187ec87ec8",
+      "stdoutSha256": "4edfb1dda8b2924ce471979fe1abeecd9951cc99c9ca695c09a0e399a0cc1e1d",
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 39643.6,
+          "oscillationRecoveries": 10478,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 388
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 69920.2,
+          "oscillationRecoveries": 21061,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 649
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 112617.9,
+          "oscillationRecoveries": 32205,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1012
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 146736.6,
+          "oscillationRecoveries": 42928,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1356
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 171873.4,
+          "oscillationRecoveries": 54005,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1600
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 219719.3,
+          "oscillationRecoveries": 65253,
+          "walkingStuckRecoveries": 0,
+          "rawTimeoutDiagnostics": 1925
+        }
+      ]
+    },
+    {
+      "seed": 255,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 120.86577247200002,
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 246,
+        "stationaryOscillation": 0,
+        "stuck": 532,
+        "timeoutMessages": 60,
+        "timeoutDiagnostics": 1373,
+        "missingSheepMessages": 24,
+        "logLines": 1207,
+        "logBytes": 165067,
+        "errors": 0,
+        "blockedStepsQueued": 57,
+        "noOpPathsQueued": 81
+      },
+      "eventCounts": {
+        "detail": 38774,
+        "startup": 1,
+        "task_deferred": 154,
+        "path_failed": 835,
+        "patrol_found": 1769,
+        "navigation_stuck": 532,
+        "xp_gain_random": 2066,
+        "gate_open_scan": 5563,
+        "npc_found": 13406,
+        "gate_block_npc": 756,
+        "target_unreachable": 783,
+        "reengage": 956,
+        "shear_timeout": 1,
+        "summary": 60,
+        "navigation_oscillation": 246,
+        "no_progress": 11,
+        "scan_fail": 866,
+        "timeouts": 1373,
+        "no_attack_timeout": 1204,
+        "flee_trigger": 474,
+        "flee_done": 468,
+        "loot_found": 857,
+        "bury_bones": 150,
+        "watchdog": 301,
+        "bury_small": 172,
+        "bury_done": 149,
+        "level_up": 17,
+        "resource_missing": 57,
+        "inv_full": 2
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 19.01514361799996,
+        "p95Ms": 26.186005000003206,
+        "p99Ms": 41.17494499999884,
+        "maxMs": 3623.386719,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 6.812205643166636,
+        "p95Ms": 12.860874000001786,
+        "p99Ms": 17.795092000000295,
+        "maxMs": 114.89079500000116,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 18.329039023076884,
+        "p95Ms": 26.076851999998325,
+        "p99Ms": 38.46738699999696,
+        "maxMs": 261.51050899999973,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 6.786080474581909,
+        "p95Ms": 12.781409000002895,
+        "p99Ms": 17.639643000002252,
+        "maxMs": 90.42198699999426,
+        "over600ms": 0
+      },
+      "xpGained": 246687.7,
+      "levelsGained": 641,
+      "botsWithXp": 66,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "stdoutLines": 1208,
+      "stdoutBytes": 165123,
+      "version": "after",
+      "cohorts": {
+        "Skiller": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 22193.5,
+          "levelsGained": 172
+        },
+        "Fighter": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 18116.0,
+          "levelsGained": 127
+        },
+        "Balanced": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 22558.2,
+          "levelsGained": 157
+        },
+        "Random": {
+          "bots": 13,
+          "botsWithXp": 13,
+          "earnedXp": 24706.1,
+          "levelsGained": 185
+        },
+        "Extras-edgeville_pker": {
+          "bots": 12,
+          "botsWithXp": 12,
+          "earnedXp": 159109.9,
+          "levelsGained": 0
+        },
+        "Extras-vendor": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        },
+        "Extras-pker": {
+          "bots": 12,
+          "botsWithXp": 2,
+          "earnedXp": 4,
+          "levelsGained": 0
+        },
+        "Extras-social": {
+          "bots": 12,
+          "botsWithXp": 0,
+          "earnedXp": 0,
+          "levelsGained": 0
+        }
+      },
+      "progressionBotsWithXp": 52,
+      "progressionBotXp": 87573.8,
+      "rawSheepSearchFailures": 57,
+      "rawReportSha256": "afbfb53633c87b802719b4947d663643d1425e1f5e8be082b4a347b519375342",
+      "stdoutSha256": "846b0aeb1f42c878f3e55f2ad101a4d3da5747c20f955076f446915743061a51",
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 37617.3,
+          "oscillationRecoveries": 35,
+          "walkingStuckRecoveries": 140,
+          "rawTimeoutDiagnostics": 250
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 77229.1,
+          "oscillationRecoveries": 131,
+          "walkingStuckRecoveries": 236,
+          "rawTimeoutDiagnostics": 550
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 122964.9,
+          "oscillationRecoveries": 186,
+          "walkingStuckRecoveries": 307,
+          "rawTimeoutDiagnostics": 752
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 161453.6,
+          "oscillationRecoveries": 203,
+          "walkingStuckRecoveries": 407,
+          "rawTimeoutDiagnostics": 980
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 203075.1,
+          "oscillationRecoveries": 232,
+          "walkingStuckRecoveries": 478,
+          "rawTimeoutDiagnostics": 1137
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 246687.7,
+          "oscillationRecoveries": 246,
+          "walkingStuckRecoveries": 532,
+          "rawTimeoutDiagnostics": 1373
+        }
+      ]
+    }
+  ]
+}

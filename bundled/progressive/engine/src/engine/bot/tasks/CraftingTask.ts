@@ -19,7 +19,8 @@
  *   Output       → gold rings deposited each banking cycle
  */
 
-import { interactHeldOpU } from '#/engine/bot/BotAction.js';
+import { interactHeldOpU, findNpcByNameExcluding } from '#/engine/bot/BotAction.js';
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -80,6 +81,9 @@ export class CraftingTask extends BotTask {
     private failTicks = 0;
     private done = false;
     private lastBallWool = 0;
+    private shearIdleTicks = 0;
+    private lastSheepNid = -1;
+    private pendingShearTicks = 0;
 
     private readonly stuck = new StuckDetector(30, 4, 2);
     private readonly watchdog = new ProgressWatchdog();
@@ -147,12 +151,46 @@ export class CraftingTask extends BotTask {
         this.failTicks = 0;
         this.done = false;
         this.lastBallWool = 0;
+        this.shearIdleTicks = 0;
+        this.lastSheepNid = -1;
+        this.pendingShearTicks = 0;
         this.stuck.reset();
         this.watchdog.reset();
     }
 
     tick(player: Player): void {
         if (this.interrupted) return;
+
+        if (this.phase === 1 && this.p1State === 'shear') {
+            const wool = countItem(player, Items.WOOL);
+            if (wool > this.lastBallWool) {
+                this.lastBallWool = wool;
+                this.shearIdleTicks = 0;
+                this.failTicks = 0;
+                this.pendingShearTicks = 0;
+                this.watchdog.notifyActivity();
+            }
+            // Shorn sheep regrow after 100 ticks. Allow a full regrowth window,
+            // then process a partial batch or let another personality-weighted task run.
+            if (++this.shearIdleTicks >= 160) {
+                player.clearPendingAction();
+                player.clearWaypoints();
+                if (wool > 0) {
+                    this.p1State = 'climb';
+                } else {
+                    (player as any)._bot?.deferCurrentTask('no wool obtained during sheep regrowth window');
+                    this.interrupt();
+                }
+                return;
+            }
+            if (player.hasInteraction() && ++this.pendingShearTicks <= 20) return;
+            if (this.pendingShearTicks > 20) {
+                player.clearPendingAction();
+                player.clearWaypoints();
+                this.pendingShearTicks = 0;
+                BotLog.event('warn', player.username, 'shear_timeout', 'Sheep approach timed out; trying another target');
+            }
+        }
 
         const banking = this.step.action === 'spin_flax'
             ? this.spinFlaxState === 'bank_walk' || this.spinFlaxState === 'withdraw'
@@ -262,7 +300,7 @@ export class CraftingTask extends BotTask {
                 }
 
                 if (!isNear(player, wx, wz, 1, wl)) {
-                    walkTo(player, wx, wz);
+                    walkTo(player, wx, wz, wl);
                     return;
                 }
 
@@ -378,16 +416,14 @@ export class CraftingTask extends BotTask {
                 // pile on the same target.  Falls back to any sheep if only one exists.
                 // NPC debugname is 'sheepunsheered' — sheared sheep become 'sheepsheered'.
                 const [sx, sz] = this.step.extra!['sheepLocation'] as [number, number, number];
-                console.log(`[CraftingTask][${player.username}] Looking for sheep at ${player.x},${player.z} radius 10`);
-                const sheep = findNpcByName(player.x, player.z, player.level, 'sheepunsheered', 20);
+                const sheep = findNpcByNameExcluding(player.x, player.z, player.level, 'sheepunsheered', this.lastSheepNid, 20);
 
                 if (!sheep) {
-                    console.log(`[CraftingTask][${player.username}] No sheep found! failTicks=${this.failTicks}`);
+                    BotLog.event('warn', player.username, 'resource_missing', `No sheep found near (${player.x},${player.z}); waiting for regrowth`);
                     this.failTicks++;
-                    if (this.failTicks >= FAIL_LIMIT) {
-                        // Walk back to sheep location center - no jitter
+                    this.cooldown = Math.min(20, 2 ** Math.min(this.failTicks, 4)) + player.slot % 5;
+                    if (this.failTicks === 1 && !isNear(player, sx, sz, 10)) {
                         walkTo(player, sx, sz);
-                        this.failTicks = 0;
                     }
                     return;
                 }
@@ -396,14 +432,15 @@ export class CraftingTask extends BotTask {
                 // animation and grants the ball_wool on completion (~3 ticks).
                 // Cooldown covers the full shearing action so the bot doesn't
                 // spam the interaction before the server has finished.
-                console.log(`[CraftingTask][${player.username}] Found sheep @ ${sheep.x},${sheep.z}, attempting shear`);
+                BotLog.debug(`[CraftingTask][${player.username}] Found sheep @ ${sheep.x},${sheep.z}, attempting shear`);
                 const ok = botInteractUseObjNpc(player, sheep, Items.SHEARS, shearsSlot);
+                this.lastSheepNid = sheep.nid;
+                this.pendingShearTicks = 0;
                 if (ok) {
-                    console.log(`[CraftingTask][${player.username}] Shear interaction sent! woolCount=${woolCount}`);
-                    this.failTicks = 0;
+                    BotLog.debug(`[CraftingTask][${player.username}] Shear interaction sent! woolCount=${woolCount}`);
                     this.cooldown = randInt(4, 6); // 3 ticks animation + 1-3 buffer
                 } else {
-                    console.log(`[CraftingTask][${player.username}] Shear FAILED! failTicks=${this.failTicks}`);
+                    BotLog.debug(`[CraftingTask][${player.username}] Shear FAILED! failTicks=${this.failTicks}`);
                     this.failTicks++;
                     if (this.failTicks >= FAIL_LIMIT) {
                         walkTo(player, sx, sz);
@@ -443,14 +480,14 @@ export class CraftingTask extends BotTask {
                 // normally completes in 0 ticks, but guards against any position drift.
                 const [wx, wz, wl] = Locations.LUMBRIDGE_POTTERS_WHEEL;
                 if (!isNear(player, wx, wz, 1, wl)) {
-                    walkTo(player, wx, wz);
+                    walkTo(player, wx, wz, wl);
                     return;
                 }
 
                 const wheel = findLocByName(player.x, player.z, player.level, 'spinning_wheel', 20) ?? findLocByPrefix(player.x, player.z, player.level, 'spinning', 25);
 
                 if (!wheel) {
-                    console.log(`[CraftingTask][${player.username}] No spinning wheel found — descending`);
+                    BotLog.debug(`[CraftingTask][${player.username}] No spinning wheel found — descending`);
                     this.failTicks++;
                     if (this.failTicks >= FAIL_LIMIT) {
                         this.p1State = 'descend';
@@ -500,7 +537,7 @@ export class CraftingTask extends BotTask {
 
                 const [wx, wz, wl] = Locations.LUMBRIDGE_POTTERS_WHEEL;
                 if (!isNear(player, wx, wz, 1, wl)) {
-                    walkTo(player, wx, wz);
+                    walkTo(player, wx, wz, wl);
                     return;
                 }
 
@@ -723,7 +760,7 @@ export class CraftingTask extends BotTask {
                         inv.remove(Items.COW_HIDE, toTan);
                         inv.remove(Items.COINS, toTan);
                         inv.add(Items.LEATHER, toTan);
-                        console.log(`[CraftingTask][${player.username}] Tanned ${toTan} leather`);
+                        BotLog.debug(`[CraftingTask][${player.username}] Tanned ${toTan} leather`);
                     }
                 }
 
@@ -801,7 +838,7 @@ export class CraftingTask extends BotTask {
                 this._depositRings(player);
 
                 if (!hasItem(player, Items.RING_MOULD)) {
-                    console.log(`[CraftingTask][${player.username}] No ring mould — done`);
+                    BotLog.debug(`[CraftingTask][${player.username}] No ring mould — done`);
                     this.done = true;
                     this.interrupt();
                     return;
@@ -809,7 +846,7 @@ export class CraftingTask extends BotTask {
 
                 const withdrew = this._withdrawGoldBars(player);
                 if (!withdrew) {
-                    console.log(`[CraftingTask][${player.username}] No gold bars — done`);
+                    BotLog.debug(`[CraftingTask][${player.username}] No gold bars — done`);
                     this.done = true;
                     this.interrupt();
                     return;

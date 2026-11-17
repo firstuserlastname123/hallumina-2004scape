@@ -342,6 +342,7 @@ class World {
 
     cycle(): void {
         try {
+            const measuredStart = performance.now();
             const start: number = Date.now();
             const drift: number = Math.max(0, start - this.nextTick);
 
@@ -463,6 +464,7 @@ class World {
             }
 
             this.cycleStats[WorldStat.CYCLE] = Date.now() - start; // set the main logic stat here, before telemetry.
+            BotManager.recordWorldTick(performance.now() - measuredStart);
 
             this.lastCycleStats[WorldStat.CYCLE] = this.cycleStats[WorldStat.CYCLE];
             this.lastCycleStats[WorldStat.WORLD] = this.cycleStats[WorldStat.WORLD];

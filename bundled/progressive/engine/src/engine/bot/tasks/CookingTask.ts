@@ -7,6 +7,7 @@
  * to replenish supplies).
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask, Player, Loc, InvType,
     walkTo, interactUseLocOp,
@@ -53,7 +54,7 @@ export class CookingTask extends BotTask {
     }
 
     private debug(player: Player, message: string): void {
-        console.log(`[CookingTask][${player.username}][${this.state}] ${message}`);
+        BotLog.debug(`[CookingTask][${player.username}][${this.state}] ${message}`);
     }
 
     // ── Task lifecycle ────────────────────────────────────────────────────────

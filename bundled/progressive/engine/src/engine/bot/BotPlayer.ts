@@ -8,15 +8,18 @@ import fs from 'fs';
 import path from 'path';
 import Player from '#/engine/entity/Player.js';
 import InvType from '#/cache/config/InvType.js';
-import { BotTask } from '#/engine/bot/tasks/Index.js';
+import { BotTask, IdleTask } from '#/engine/bot/tasks/Index.js';
 import { BotGoalPlanner } from '#/engine/bot/BotGoalPlanner.js';
 import { addXp, getBaseLevel, PlayerStat, openNearbyGate } from '#/engine/bot/BotAction.js';
 import { PlayerStatNameMap } from '#/engine/entity/PlayerStat.js';
 import ScriptState from '#/engine/script/ScriptState.js';
-import { BotMovementMonitor } from '#/engine/bot/BotNavigation.js';
+import { BotMovementMonitor } from '#/engine/bot/BotMovementMonitor.js';
+import { BotRouteRetry } from '#/engine/bot/BotRouteRetry.js';
+import { BotLog, BotLogLevel } from '#/engine/bot/BotLog.js';
 import { BotDebugService } from '#/engine/bot/debug/BotDebugService.js';
 
 const RESCAN_TICKS = 600;
+const SUBTASK_MAX_TICKS = 300;
 
 const NO_INTERRUPT_TASKS = new Set(['ShopTrip', 'Bank', 'Walk', 'Init', 'Idle', 'Prayer']);
 
@@ -48,6 +51,14 @@ export class BotPlayer {
 
     currentTask: BotTask | null = null;
     taskHistory: string[] = [];
+    xpGained = 0;
+    levelsGained = 0;
+
+    /** Observes addXp only; preset PK profiles and loaded saves are not progression. */
+    recordXpGain(internalXp: number, levels: number): void {
+        this.xpGained += internalXp / 10;
+        this.levelsGained += levels;
+    }
 
     private ticksAlive = 0;
     private rescanTimer = 0;
@@ -57,6 +68,12 @@ export class BotPlayer {
 
     // ── Movement monitoring ───────────────────────────────────────────────────
     readonly movementMonitor = new BotMovementMonitor();
+    private readonly mainNavigation = new BotRouteRetry();
+    private readonly subNavigation = new BotRouteRetry();
+    private tickingTask: BotTask | null = null;
+
+    get activeTask(): BotTask | null { return this.tickingTask ?? this.subTask ?? this.currentTask; }
+    get navigation(): BotRouteRetry { return this.activeTask && this.activeTask !== this.currentTask ? this.subNavigation : this.mainNavigation; }
     /** Position at the end of the previous tick (set by engine movement before bot.tick). */
     private lastX = -1;
     private lastZ = -1;
@@ -66,6 +83,9 @@ export class BotPlayer {
 
     // ── Sub-task system (for bury bones, eating, etc.) ───────────────────────
     private subTask: BotTask | null = null;
+    private subTaskTicks = 0;
+    private subTaskYieldPending = false;
+    private readonly subTaskRetryAt = new Map<string, number>();
 
     // ── Deferred teleport ─────────────────────────────────────────────────────
     // botTeleport() stores the destination here and sets player.delayed for 2
@@ -173,14 +193,31 @@ export class BotPlayer {
     }
 
     // ── Sub-task API ─────────────────────────────────────────────────────────
-    setSubTask(task: BotTask): void {
+    /** Refuse duplicate/replacement requests while a child is running or cooling down. */
+    setSubTask(task: BotTask): boolean {
+        if (this.subTask?.interrupted) this.deferSubTask(this.subTask, 'subtask interrupted', 200);
+        if (this.subTask || this.subTaskYieldPending || this.currentTask?.interrupted || task === this.currentTask || this.ticksAlive < (this.subTaskRetryAt.get(task.name) ?? 0)) return false;
         task.reset();
         this.subTask = task;
+        this.subTaskTicks = 0;
+        this.subNavigation.reset();
+        this.clearSubTaskMovement();
+        return true;
     }
 
     tick(): void {
+        try {
+            this._tick();
+        } finally {
+            // Includes subtasks, dialogs, planning failures and deferred teleports.
+            this.lastHadWaypoints = this.player.hasWaypoints() && !this.player.delayed && this.pendingTeleport === null;
+        }
+    }
+
+    private _tick(): void {
         this.ticksAlive++;
         this.player.afkEventReady = false;
+        if (this.subTask && this.currentTask?.interrupted) this.deferSubTask(this.subTask, 'parent task interrupted', 200);
 
         try {
             this._debugTick();
@@ -197,23 +234,31 @@ export class BotPlayer {
         const curX = this.player.x;
         const curZ = this.player.z;
         const curLevel = this.player.level;
+        // Parent activity time must not become a stall while its child has priority.
+        if (this.subTask) this.mainNavigation.observe(curX, curZ, curLevel, false, this.ticksAlive);
 
         if (this.lastX !== -1) {
             const moved = curX !== this.lastX || curZ !== this.lastZ || curLevel !== this.lastLevel;
-            this.movementMonitor.update(curX, curZ, this.lastHadWaypoints, moved);
+            const walking = this.lastHadWaypoints && !this.player.delayed && this.pendingTeleport === null && curLevel === this.lastLevel;
+            this.navigation.observe(curX, curZ, curLevel, walking, this.ticksAlive);
+            this.movementMonitor.update(curX, curZ, walking, moved, curLevel);
 
-            if (this.lastHadWaypoints && this.movementMonitor.isStuck()) {
+            if (walking && this.movementMonitor.isStuck()) {
                 this.log(
-                    `[Navigation] stuck at (${curX},${curZ},${curLevel}) — clearing waypoints for repath`
+                    `[Navigation] stuck at (${curX},${curZ},${curLevel}) task=${this.activeTask?.name} — clearing waypoints for repath`, 'warn', 'navigation_stuck'
                 );
                 this.player.clearWaypoints();
+                this.player.clearPendingAction();
                 this.movementMonitor.resetStuck();
-            } else if (this.movementMonitor.isOscillating()) {
+                this.navigationFailed('stuck');
+            } else if (walking && this.movementMonitor.isOscillating()) {
                 this.log(
-                    `[Navigation] oscillating at (${curX},${curZ},${curLevel}) — clearing waypoints`
+                    `[Navigation] oscillating at (${curX},${curZ},${curLevel}) task=${this.activeTask?.name} — clearing waypoints`, 'warn', 'navigation_oscillation'
                 );
                 this.player.clearWaypoints();
+                this.player.clearPendingAction();
                 this.movementMonitor.resetOscillation();
+                this.navigationFailed('oscillating');
             }
         }
 
@@ -258,18 +303,35 @@ export class BotPlayer {
 
         // ── SUB TASK (HIGH PRIORITY) ─────────────────────────────
         if (this.subTask) {
-            if (this.subTask.isComplete(this.player) || !this.subTask.shouldRun(this.player)) {
-                this.subTask = null;
-            } else {
-                try {
-                    this.subTask.tick(this.player);
-                } catch (err) {
-                    console.error(`[Bot:${this.name}] SubTask error:`, err);
-                    this.subTask = null;
+            const child = this.subTask;
+            let ran = false;
+            this.tickingTask = child;
+            try {
+                if (child.interrupted) {
+                    this.deferCurrentTask('subtask interrupted');
+                } else if (child.isComplete(this.player)) {
+                    this.finishSubTask(child);
+                } else if (!child.shouldRun(this.player)) {
+                    this.deferCurrentTask('subtask requirements unavailable');
+                } else if (++this.subTaskTicks > SUBTASK_MAX_TICKS) {
+                    this.deferCurrentTask('subtask exceeded active tick budget');
+                } else {
+                    ran = true;
+                    child.tick(this.player);
                 }
-                return; // ⛔ block main task while subtask runs
+            } catch (err) {
+                console.error(`[Bot:${this.name}] SubTask error:`, err);
+                this.deferCurrentTask('subtask error');
+            } finally {
+                this.tickingTask = null;
+                // An interrupted child cannot leave another route queued as it exits.
+                if (this.subTask !== child) this.clearSubTaskMovement();
             }
+            if (ran) return;
         }
+
+        // Give the parent/planner a turn before accepting any new child name.
+        this.subTaskYieldPending = false;
 
         // ── RESCAN ───────────────────────────────────────────────
         this.rescanTimer++;
@@ -279,7 +341,7 @@ export class BotPlayer {
             if (this.currentTask && !NO_INTERRUPT_TASKS.has(this.currentTask.name)) {
                 const candidate = this.planner.pickTask(this.player);
 
-                if (candidate && candidate.name !== this.currentTask.name) {
+                if (candidate && candidate.name !== this.currentTask.name && !this.planner.isDeferred(candidate.name, this.player.playtime)) {
                     this.log(`Rescan: ${this.currentTask.name} → ${candidate.name}`);
                     this.currentTask.interrupt();
                     this._switchTask(candidate);
@@ -314,6 +376,7 @@ export class BotPlayer {
         if (!this.currentTask!.shouldRun(this.player)) {
             this.planFailCount++;
             this.log(`${this.currentTask!.name} can't run (fail #${this.planFailCount})`);
+            this.deferCurrentTask('requirements unavailable', 100);
 
             if (this.planFailCount >= 5) {
                 this.planFailCount = 0;
@@ -345,15 +408,16 @@ export class BotPlayer {
           //  }
         //}
 
+        this.tickingTask = activeTask;
         try {
             activeTask.tick(this.player);
         } catch (err) {
             console.error(`[Bot:${this.name}] Task error in ${activeTask.name}:`, err);
-            this.currentTask = null;
+            this.deferCurrentTask('task error');
+        } finally {
+            this.tickingTask = null;
+            if (this.subTask) this.clearSubTaskMovement();
         }
-
-        // Record waypoint state at end of this tick so next tick can detect stuck/oscillation
-        this.lastHadWaypoints = this.player.hasWaypoints();
     }
 
     onLevelUp(stat: PlayerStat, newLevel: number): void {
@@ -388,12 +452,60 @@ export class BotPlayer {
         };
     }
 
-    log(msg: string): void {
-        console.log(`[Bot:${this.name}][t${this.ticksAlive}] ${msg}`);
+    log(msg: string, level: BotLogLevel = 'debug', key = 'detail'): void {
+        BotLog.event(level, this.name, key, msg);
+    }
+
+    navigationFailed(reason: string): void {
+        if (this.activeTask?.interrupted) return;
+        if (reason === 'path_failed' || reason === 'no_progress') this.log(`[Navigation] ${reason} at (${this.player.x},${this.player.z},${this.player.level}) task=${this.activeTask?.name} toward ${this.navigation.destinationLabel}`, 'warn', reason);
+        if (this.navigation.fail(this.ticksAlive)) this.deferCurrentTask(`navigation: ${reason}`);
+    }
+
+    deferCurrentTask(reason: string, ticks = 200): void {
+        const active = this.activeTask;
+        if (active && active !== this.currentTask) {
+            this.deferSubTask(active, reason, ticks);
+            return;
+        }
+        if (this.subTask) this.deferSubTask(this.subTask, 'parent task deferred', ticks);
+        if (!this.currentTask) return;
+        this.planner.deferTask(this.currentTask.name, this.player.playtime + ticks);
+        this.log(`${this.currentTask.name} deferred for ${ticks} ticks: ${reason}`, 'warn', 'task_deferred');
+        this.currentTask.interrupt();
+        this.player.clearPendingAction();
+        this.player.clearWaypoints();
+    }
+
+    private deferSubTask(task: BotTask, reason: string, ticks: number): void {
+        this.subTaskRetryAt.delete(task.name);
+        if (this.subTaskRetryAt.size >= 64) this.subTaskRetryAt.delete(this.subTaskRetryAt.keys().next().value!);
+        this.subTaskRetryAt.set(task.name, this.ticksAlive + ticks);
+        this.log(`Subtask ${task.name} deferred for ${ticks} ticks: ${reason}; parent=${this.currentTask?.name ?? 'planner'}`, 'warn', 'subtask_deferred');
+        this.finishSubTask(task, true);
+    }
+
+    private finishSubTask(task: BotTask, interrupted = false): void {
+        if (this.subTask !== task) return;
+        this.subTask = null;
+        this.subTaskYieldPending = true;
+        task.reset(); // release task-owned resources/claims before the parent resumes
+        if (interrupted) task.interrupt();
+        this.subNavigation.reset();
+        this.clearSubTaskMovement();
+    }
+
+    private clearSubTaskMovement(): void {
+        this.player.clearPendingAction();
+        this.player.clearWaypoints();
+        this.movementMonitor.reset();
+        this.lastHadWaypoints = false;
+        this.mainNavigation.observe(this.player.x, this.player.z, this.player.level, false, this.ticksAlive);
     }
 
     private _pickTask(): BotTask | null {
-        const task = this.planner.pickTask(this.player);
+        const picked = this.planner.pickTask(this.player);
+        const task = picked && this.planner.isDeferred(picked.name, this.player.playtime) ? new IdleTask(30) : picked;
 
         if (task) {
             task.reset();
@@ -419,6 +531,10 @@ export class BotPlayer {
         }
         this.currentTask = next;
         this.movementMonitor.reset(); // clear stuck/oscillation state between tasks
+        this.navigation.reset();
+        this.lastHadWaypoints = false;
+        this.player.clearPendingAction();
+        this.player.clearWaypoints();
     }
 
     private _recordComplete(): void {

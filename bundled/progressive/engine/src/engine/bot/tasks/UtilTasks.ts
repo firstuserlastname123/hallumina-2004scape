@@ -2,6 +2,7 @@
  * UtilTasks.ts — InitTask, WalkTask, BankTask, BuryBonesTask, IdleTask, SellTask
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask, Player, InvType,
     walkTo, interactNpcOp, findNpcByPrefix, findNpcByName, isNear,
@@ -276,14 +277,14 @@ export class BuryBonesTask extends BotTask {
                 const removed = removeItem(player, Items.BIG_BONES, 1);
 
                 if (!removed) {
-                    console.log(`[Prayer] ❌ failed to remove BIG_BONES`);
+                    BotLog.debug(`[Prayer] ❌ failed to remove BIG_BONES`);
                     return;
                 }
 
                 player.stats[PlayerStat.PRAYER] = before + 150;
                 this.buryCount++;
 
-                console.log(
+                BotLog.debug(
                     `[Prayer] 🦴 buried BIG BONES +150 XP (total=${player.stats[PlayerStat.PRAYER]})`
                 );
 
@@ -296,14 +297,14 @@ export class BuryBonesTask extends BotTask {
                 const removed = removeItem(player, Items.BONES, 1);
 
                 if (!removed) {
-                    console.log(`[Prayer] ❌ failed to remove BONES`);
+                    BotLog.debug(`[Prayer] ❌ failed to remove BONES`);
                     return;
                 }
 
                 player.stats[PlayerStat.PRAYER] = before + 45;
                 this.buryCount++;
 
-                console.log(
+                BotLog.debug(
                     `[Prayer] 🦴 buried bones +45 XP (total=${player.stats[PlayerStat.PRAYER]})`
                 );
 
@@ -312,7 +313,7 @@ export class BuryBonesTask extends BotTask {
             }
 
             // ── DONE ─────────────────
-            console.log(`[Prayer] ✅ finished burying (${this.buryCount} bones)`);
+            BotLog.debug(`[Prayer] ✅ finished burying (${this.buryCount} bones)`);
             this.state = 'done';
             return;
         }

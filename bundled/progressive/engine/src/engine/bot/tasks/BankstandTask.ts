@@ -1,3 +1,4 @@
+import { BotLog } from '#/engine/bot/BotLog.js';
 import ObjType from '#/cache/config/ObjType.js';
 import {
     
@@ -592,7 +593,7 @@ private intentCooldown = 0;
                 if(!this.requestedAll) {
                     if (itemId) {
                         if ((itemId.id != this.requestedItem) && ((itemId.id - 1) != this.requestedItem)) {
-                            //console.log(itemId.id + '(' + itemId.count + ') != ' + this.requestedItem + ' removing...');
+                            //BotLog.debug(itemId.id + '(' + itemId.count + ') != ' + this.requestedItem + ' removing...');
                             interactIF_UseOp(player, Interfaces.TRADE_MAIN_INV, itemId.id, this.currentOfferSlot, 4, 90);
                         } else {
                             this.requestedItemCount = itemId.count;
@@ -909,7 +910,7 @@ private intentCooldown = 0;
                 const moved = inv.remove(item.id, count);
                 if (moved.completed > 0) {
                     bank.add(item.id, moved.completed);
-                    console.log('Banked item: ' + item.id + ' x ' + item.count);
+                    BotLog.debug('Banked item: ' + item.id + ' x ' + item.count);
                     break;
                 }
             }
@@ -931,10 +932,10 @@ private intentCooldown = 0;
                 if (!item) continue;
                 if (viableItemId.has(item.id)) {
                     //we withdraw
-                    console.log('Attempting to withdraw item: ' + item.id + ' from slot: ' + slot);
+                    BotLog.debug('Attempting to withdraw item: ' + item.id + ' from slot: ' + slot);
                     const amount = item.count;
                     if(interactIF_UseOp(player, Interfaces.BANK_MAIN_INV, item.id, slot, 4, 95)) {
-                        console.log('(' + player.displayName + ') successfully withdrawn item: ' + item.id + ' x ' + amount);
+                        BotLog.debug('(' + player.displayName + ') successfully withdrawn item: ' + item.id + ' x ' + amount);
                         const existing = this.stock.get(item.id);
                         const price = this.getItemPrice(item.id);
 
@@ -947,7 +948,7 @@ private intentCooldown = 0;
                             });
                         }
                     } else {
-                        console.log('Could not withdraw item! ('+ item.id +') for (' + player.displayName + ')');
+                        BotLog.debug('Could not withdraw item! ('+ item.id +') for (' + player.displayName + ')');
                     }
                 }
             }
@@ -956,7 +957,7 @@ private intentCooldown = 0;
 
     private resetTrade(player: Player, reason?: string): void {
         if (reason) {
-            console.log('[Trade] Reset:', reason);
+            BotLog.debug('[Trade] Reset:', reason);
         }
         //Reset everything
         player.botTradeTargetPid = -1;

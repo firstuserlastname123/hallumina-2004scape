@@ -21,6 +21,7 @@
  * server script doesn't run (map_members=false or similar).
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -734,6 +735,6 @@ export class HerbloreTask extends BotTask {
     }
 
     private _log(player: Player, msg: string): void {
-        console.log(`[HerbloreTask][${player.username}][${this.state}] ${msg}`);
+        BotLog.debug(`[HerbloreTask][${player.username}][${this.state}] ${msg}`);
     }
 }

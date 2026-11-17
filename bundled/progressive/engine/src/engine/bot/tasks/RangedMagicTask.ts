@@ -37,6 +37,7 @@
  *   Exit: teleJump back to TAVERLY_DUNGEON_ENTRANCE before banking.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -191,7 +192,7 @@ export class RangedMagicTask extends BotTask {
         this.lastLogKey = logKey;
         this.lastLogTime = now;
         const prefix = player ? `[P:${player.x},${player.z}]` : '[BOT]';
-        console.log(`${prefix} [RangedMagicTask] ${msg}`);
+        BotLog.debug(`${prefix} [RangedMagicTask] ${msg}`);
     }
 
     // ── shouldRun ─────────────────────────────────────────────────────────────
