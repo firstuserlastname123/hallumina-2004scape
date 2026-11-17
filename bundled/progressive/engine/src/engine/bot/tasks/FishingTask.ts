@@ -2,6 +2,7 @@
  * FishingTask.ts — Fish at spots, bank when full, progression-aware fishing loop.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask, Player, Npc, InvType,
     walkTo, interactNpc, interactNpcOp,
@@ -365,7 +366,7 @@ export class FishingTask extends BotTask {
             if (moved.completed > 0) {
                 bank.add(item.id, moved.completed);
             }
-             console.log(`[FSH:${player.username}] Deposited fish into the bank.`);
+             BotLog.debug(`[FSH:${player.username}] Deposited fish into the bank.`);
         }
 
     }

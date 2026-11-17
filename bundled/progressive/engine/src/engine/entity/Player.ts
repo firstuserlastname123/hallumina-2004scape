@@ -1927,6 +1927,7 @@ export default class Player extends PathingEntity {
             const scale = Environment.NODE_PROGRESSIVE_XP_SCALE;
             multi *= 1 + Math.sqrt((currentLevel - 1) / 98) * (scale - 1);
         }
+        const beforeXp = this.stats[stat];
         this.stats[stat] += xp * multi;
 
         // cap to 200m, this is represented as "2 billion" because we use 32-bit signed integers and divide by 10 to give us a decimal point
@@ -1940,6 +1941,7 @@ export default class Player extends PathingEntity {
             this.levels[stat] = getLevelByExp(this.stats[stat]);
         }
         this.baseLevels[stat] = getLevelByExp(this.stats[stat]);
+        if (this.is_bot) (this as any)._bot?.recordXpGain(this.stats[stat] - beforeXp, Math.max(0, this.baseLevels[stat] - before));
 
         if (this.baseLevels[stat] > before) {
             if (this.levels[stat] < before) {

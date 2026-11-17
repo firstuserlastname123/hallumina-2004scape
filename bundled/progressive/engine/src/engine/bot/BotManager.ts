@@ -26,7 +26,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import Player, { getExpByLevel } from '#/engine/entity/Player.js';
-import { PlayerStat, getBaseLevel, setVarp } from '#/engine/bot/BotAction.js';
+import { PlayerStat, setVarp } from '#/engine/bot/BotAction.js';
 import { BotPlayer } from '#/engine/bot/BotPlayer.js';
 import { setWorld, BotWorldHandle } from '#/engine/bot/BotWorld.js';
 import { ensureBotAccount } from '#/engine/bot/BotDatabase.js';
@@ -42,6 +42,8 @@ import Environment from '#/util/Environment.js';
 import { toBase37, fromBase37 } from '#/util/JString.js';
 import { ChatModePrivate } from '#/engine/entity/ChatModes.js';
 import { BotDebugService } from '#/engine/bot/debug/BotDebugService.js';
+import { BotLog, BOT_SUMMARY_TICKS, BOT_LOG_DETAILS } from '#/engine/bot/BotLog.js';
+import { BotTickMetrics } from '#/engine/bot/BotTickMetrics.js';
 
 /** Normalize a bot username the same way PlayerLoading does.
  *  RS2 base37 maps underscores → spaces and strips unsupported chars,
@@ -109,8 +111,6 @@ interface BotConfig {
 const BOT_CONFIGS: BotConfig[] = loadBotConfigs();
 const CONFIGURED_BOT_USERNAMES = new Set(BOT_CONFIGS.map(cfg => normalizeBotUsername(cfg.username)));
 
-const STATUS_EVERY_TICKS = 100;
-
 // ── BotManager singleton ──────────────────────────────────────────────────────
 
 class BotManagerClass {
@@ -121,6 +121,9 @@ class BotManagerClass {
     private accountIds: Map<string, number> = new Map();
     private spawned = false;
     private tickCount = 0;
+    private lastSummaryTick = 0;
+    private readonly botTimings = new BotTickMetrics();
+    private readonly worldTimings = new BotTickMetrics();
 
     /**
      * Call from World.ts start() before this.cycle():
@@ -135,10 +138,10 @@ class BotManagerClass {
 
         BotDebugService.configure();
         if (BotDebugService.enabled) {
-            console.log(`[BotManager] Bot debugger ENABLED — dashboard at http://localhost:${Environment.WEB_PORT}/debug/bots (level=${BotDebugService.level})`);
+            BotLog.debug(`[BotManager] Bot debugger ENABLED — dashboard at http://localhost:${Environment.WEB_PORT}/debug/bots (level=${BotDebugService.level})`);
         }
 
-        console.log(`[BotManager] Spawning ${BOT_CONFIGS.length} bots from Lumbridge...`);
+        BotLog.event('info', 'population', 'startup', `Spawning ${BOT_CONFIGS.length} configured bots`);
         for (const cfg of BOT_CONFIGS) this._spawnBot(cfg);
     }
 
@@ -156,10 +159,11 @@ class BotManagerClass {
         }
 
         this.tickCount++;
+        BotLog.tick = this.tickCount;
 
         const debugOn = BotDebugService.enabled;
         if (debugOn) BotDebugService.setTick(this.tickCount);
-        const tickStart = debugOn ? Date.now() : 0;
+        const tickStart = performance.now();
 
         for (const bot of this.bots.values()) {
             if (bot.player.slot === -1) continue;
@@ -173,18 +177,33 @@ class BotManagerClass {
             }
         }
 
-        if (debugOn) BotDebugService.recordGlobalTickDuration(Date.now() - tickStart);
+        const elapsed = performance.now() - tickStart;
+        this.botTimings.record(elapsed);
+        if (debugOn) BotDebugService.recordGlobalTickDuration(elapsed);
+    }
 
-        if (this.tickCount % STATUS_EVERY_TICKS === 0) {
-            // The web dashboard (see BotDebugService) is the primary debugger when
-            // enabled — keep the terminal to a single summary line instead of the
-            // full per-bot ASCII status boxes to cut noise (spec section 25).
-            if (debugOn) {
-                this._printCompactStatus();
-            } else {
-                this._printStatus();
-            }
+    /** Called after the complete world's game logic, independently of the dashboard. */
+    recordWorldTick(ms: number): void {
+        this.worldTimings.record(ms);
+        if (!BOT_SUMMARY_TICKS || this.tickCount === this.lastSummaryTick || this.tickCount % BOT_SUMMARY_TICKS !== 0) return;
+        this.lastSummaryTick = this.tickCount;
+        const bots = [...this.bots.values()].filter(bot => bot.player.slot !== -1);
+        const tasks: Record<string, number> = {};
+        for (const bot of bots) tasks[bot.currentTask?.name ?? 'Idle'] = (tasks[bot.currentTask?.name ?? 'Idle'] ?? 0) + 1;
+        const timing = (value: BotTickMetrics) => {
+            const s = value.snapshot();
+            return `${s.meanMs.toFixed(2)}/${s.p95Ms.toFixed(2)}/${s.maxMs.toFixed(2)}ms`;
+        };
+        BotLog.event('info', 'population', 'summary',
+            `${bots.length}/${this.bots.size} active | tasks=${JSON.stringify(tasks)} | ` +
+            `world mean/p95/max=${timing(this.worldTimings)} over600ms=${this.worldTimings.snapshot().over600ms} | ` +
+            `bots mean/p95/max=${timing(this.botTimings)} | XP=${bots.reduce((sum, bot) => sum + bot.xpGained, 0).toFixed(1)} levels=${bots.reduce((sum, bot) => sum + bot.levelsGained, 0)} | ` +
+            `events=${JSON.stringify(BotLog.counts)} rateLimited=${BotLog.suppressed}`, false);
+        if (BOT_LOG_DETAILS && BotLog.level === 'debug') {
+            for (const bot of bots) BotLog.event('debug', bot.name, 'status', JSON.stringify(bot.snapshot()));
         }
+        this.botTimings.reset();
+        this.worldTimings.reset();
     }
 
     isConfiguredBot(username: string): boolean {
@@ -279,14 +298,14 @@ class BotManagerClass {
         if (!saveExists) {
             try {
                 BotAppearance.randomize(player);
-                console.log(`[BotManager] Randomized appearance for new bot: ${normalizedUsername}`);
+                BotLog.debug(`[BotManager] Randomized appearance for new bot: ${normalizedUsername}`);
             } catch (err) {
                 console.error(`[BotManager] BotAppearance failed for ${normalizedUsername}:`, err);
             }
         } else {
             try {
                 BotAppearance.randomizeBody(player);
-                console.log(`[BotManager] Refreshed appearance for existing bot: ${normalizedUsername}`);
+                BotLog.debug(`[BotManager] Refreshed appearance for existing bot: ${normalizedUsername}`);
             } catch (err) {
                 console.error(`[BotManager] BotAppearance refresh failed for ${normalizedUsername}:`, err);
             }
@@ -383,7 +402,7 @@ class BotManagerClass {
         // ─────────────────────────────────────────────
         player.buildAppearance(InvType.WORN);
 
-        console.log(`[BotManager] Loaded bot: ${normalizedUsername}`);
+        BotLog.debug(`[BotManager] Loaded bot: ${normalizedUsername}`);
 
         // Ensure a DB account row exists so LoginServer can find this bot during
         // the player_logout flow (by player.username = normalizedUsername), and
@@ -397,66 +416,6 @@ class BotManagerClass {
             .catch(err => console.error(`[BotManager] ensureBotAccount failed for ${normalizedUsername}:`, err));
     }
 
-    private static readonly STAT_LABELS: string[] = ['Atk', 'Str', 'Def', 'HP', 'Rng', 'Pray', 'Mag', 'Cook', 'WC', 'Flet', 'Fish', 'FM', 'Craft', 'Smith', 'Mine', 'Herb', 'Agi', 'Thiev', 'Slay', 'Farm', 'RC'];
-
-    private _printCompactStatus(): void {
-        const activeBots = [...this.bots.values()].filter(bot => bot.player.slot !== -1);
-        const metrics = BotDebugService.getMetrics();
-        console.log(
-            `[BotManager] ${activeBots.length}/${this.bots.size} active | stuck=${metrics.stuckBots} warn=${metrics.warningBots} err=${metrics.errorBots} | avgTick=${metrics.avgTickDurationMs}ms maxTick=${metrics.maxTickDurationMs}ms | dashboard clients=${metrics.dashboardClients}`
-        );
-    }
-
-    private _printStatus(): void {
-        const activeBots = [...this.bots.values()].filter(bot => bot.player.slot !== -1);
-        const now = new Date().toLocaleTimeString();
-
-        console.log('');
-        console.log('┌──────────────────── BotManager Status ────────────────────┐');
-        console.log(`│ Time: ${now.padEnd(50)}│`);
-        console.log(`│ Bots: ${String(activeBots.length).padEnd(5)} active / ${String(this.bots.size).padEnd(5)} total${' '.repeat(25)}│`);
-        console.log('└───────────────────────────────────────────────────────────┘');
-        console.log('');
-
-        for (const bot of activeBots) {
-            const s = bot.snapshot();
-            const levels = this._getAllSkillLevels(bot.player);
-
-            const width = 98;
-            const inner = width - 2;
-
-            console.log(`┌${'─'.repeat(inner)}┐`);
-            console.log(`│ ${`${s.name} • ${s.task ?? 'idle'}`.padEnd(inner - 1)}│`);
-            console.log(`│ ${`Pos: (${s.x}, ${s.z}, ${s.level})`.padEnd(inner - 1)}│`);
-            console.log(`│ ${this._skillRow(levels, 0, 7).padEnd(inner - 1)}│`);
-            console.log(`│ ${this._skillRow(levels, 7, 7).padEnd(inner - 1)}│`);
-            console.log(`│ ${this._skillRow(levels, 14, 7).padEnd(inner - 1)}│`);
-            console.log(`└${'─'.repeat(inner)}┘`);
-        }
-
-        console.log('');
-    }
-
-    private _getAllSkillLevels(player: Player): number[] {
-        const levels: number[] = [];
-        for (let stat = 0; stat < 21; stat++) {
-            levels.push(getBaseLevel(player, stat as PlayerStat));
-        }
-        return levels;
-    }
-
-    private _skillRow(levels: number[], start: number, count: number): string {
-        const parts: string[] = [];
-
-        for (let i = 0; i < count; i++) {
-            const idx = start + i;
-            const label = BotManagerClass.STAT_LABELS[idx] ?? `S${idx}`;
-            const value = levels[idx] ?? 0;
-            parts.push(`${label}:${String(value).padStart(2)}`);
-        }
-
-        return parts.join('  ');
-    }
 }
 
 export const BotManager = new BotManagerClass();

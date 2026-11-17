@@ -8,12 +8,14 @@ import fs from 'fs';
 import path from 'path';
 import Player from '#/engine/entity/Player.js';
 import InvType from '#/cache/config/InvType.js';
-import { BotTask } from '#/engine/bot/tasks/Index.js';
+import { BotTask, IdleTask } from '#/engine/bot/tasks/Index.js';
 import { BotGoalPlanner } from '#/engine/bot/BotGoalPlanner.js';
 import { addXp, getBaseLevel, PlayerStat, openNearbyGate } from '#/engine/bot/BotAction.js';
 import { PlayerStatNameMap } from '#/engine/entity/PlayerStat.js';
 import ScriptState from '#/engine/script/ScriptState.js';
-import { BotMovementMonitor } from '#/engine/bot/BotNavigation.js';
+import { BotMovementMonitor } from '#/engine/bot/BotMovementMonitor.js';
+import { BotRouteRetry } from '#/engine/bot/BotRouteRetry.js';
+import { BotLog, BotLogLevel } from '#/engine/bot/BotLog.js';
 import { BotDebugService } from '#/engine/bot/debug/BotDebugService.js';
 
 const RESCAN_TICKS = 600;
@@ -48,6 +50,14 @@ export class BotPlayer {
 
     currentTask: BotTask | null = null;
     taskHistory: string[] = [];
+    xpGained = 0;
+    levelsGained = 0;
+
+    /** Observes addXp only; preset PK profiles and loaded saves are not progression. */
+    recordXpGain(internalXp: number, levels: number): void {
+        this.xpGained += internalXp / 10;
+        this.levelsGained += levels;
+    }
 
     private ticksAlive = 0;
     private rescanTimer = 0;
@@ -57,6 +67,7 @@ export class BotPlayer {
 
     // ── Movement monitoring ───────────────────────────────────────────────────
     readonly movementMonitor = new BotMovementMonitor();
+    readonly navigation = new BotRouteRetry();
     /** Position at the end of the previous tick (set by engine movement before bot.tick). */
     private lastX = -1;
     private lastZ = -1;
@@ -179,6 +190,15 @@ export class BotPlayer {
     }
 
     tick(): void {
+        try {
+            this._tick();
+        } finally {
+            // Includes subtasks, dialogs, planning failures and deferred teleports.
+            this.lastHadWaypoints = this.player.hasWaypoints() && !this.player.delayed && this.pendingTeleport === null;
+        }
+    }
+
+    private _tick(): void {
         this.ticksAlive++;
         this.player.afkEventReady = false;
 
@@ -200,20 +220,26 @@ export class BotPlayer {
 
         if (this.lastX !== -1) {
             const moved = curX !== this.lastX || curZ !== this.lastZ || curLevel !== this.lastLevel;
-            this.movementMonitor.update(curX, curZ, this.lastHadWaypoints, moved);
+            const walking = this.lastHadWaypoints && !this.player.delayed && this.pendingTeleport === null && curLevel === this.lastLevel;
+            this.navigation.observe(curX, curZ, curLevel, walking, this.ticksAlive);
+            this.movementMonitor.update(curX, curZ, walking, moved, curLevel);
 
-            if (this.lastHadWaypoints && this.movementMonitor.isStuck()) {
+            if (walking && this.movementMonitor.isStuck()) {
                 this.log(
-                    `[Navigation] stuck at (${curX},${curZ},${curLevel}) — clearing waypoints for repath`
+                    `[Navigation] stuck at (${curX},${curZ},${curLevel}) — clearing waypoints for repath`, 'warn', 'navigation_stuck'
                 );
                 this.player.clearWaypoints();
+                this.player.clearPendingAction();
                 this.movementMonitor.resetStuck();
-            } else if (this.movementMonitor.isOscillating()) {
+                this.navigationFailed('stuck');
+            } else if (walking && this.movementMonitor.isOscillating()) {
                 this.log(
-                    `[Navigation] oscillating at (${curX},${curZ},${curLevel}) — clearing waypoints`
+                    `[Navigation] oscillating at (${curX},${curZ},${curLevel}) — clearing waypoints`, 'warn', 'navigation_oscillation'
                 );
                 this.player.clearWaypoints();
+                this.player.clearPendingAction();
                 this.movementMonitor.resetOscillation();
+                this.navigationFailed('oscillating');
             }
         }
 
@@ -279,7 +305,7 @@ export class BotPlayer {
             if (this.currentTask && !NO_INTERRUPT_TASKS.has(this.currentTask.name)) {
                 const candidate = this.planner.pickTask(this.player);
 
-                if (candidate && candidate.name !== this.currentTask.name) {
+                if (candidate && candidate.name !== this.currentTask.name && !this.planner.isDeferred(candidate.name, this.player.playtime)) {
                     this.log(`Rescan: ${this.currentTask.name} → ${candidate.name}`);
                     this.currentTask.interrupt();
                     this._switchTask(candidate);
@@ -314,6 +340,7 @@ export class BotPlayer {
         if (!this.currentTask!.shouldRun(this.player)) {
             this.planFailCount++;
             this.log(`${this.currentTask!.name} can't run (fail #${this.planFailCount})`);
+            this.deferCurrentTask('requirements unavailable', 100);
 
             if (this.planFailCount >= 5) {
                 this.planFailCount = 0;
@@ -349,11 +376,8 @@ export class BotPlayer {
             activeTask.tick(this.player);
         } catch (err) {
             console.error(`[Bot:${this.name}] Task error in ${activeTask.name}:`, err);
-            this.currentTask = null;
+            this.deferCurrentTask('task error');
         }
-
-        // Record waypoint state at end of this tick so next tick can detect stuck/oscillation
-        this.lastHadWaypoints = this.player.hasWaypoints();
     }
 
     onLevelUp(stat: PlayerStat, newLevel: number): void {
@@ -388,12 +412,27 @@ export class BotPlayer {
         };
     }
 
-    log(msg: string): void {
-        console.log(`[Bot:${this.name}][t${this.ticksAlive}] ${msg}`);
+    log(msg: string, level: BotLogLevel = 'debug', key = 'detail'): void {
+        BotLog.event(level, this.name, key, msg);
+    }
+
+    navigationFailed(reason: string): void {
+        if (reason === 'path_failed' || reason === 'no_progress') this.log(`[Navigation] ${reason} at (${this.player.x},${this.player.z},${this.player.level}) toward ${this.navigation.destinationLabel}`, 'warn', reason);
+        if (this.navigation.fail(this.ticksAlive)) this.deferCurrentTask(`navigation: ${reason}`);
+    }
+
+    deferCurrentTask(reason: string, ticks = 200): void {
+        if (!this.currentTask) return;
+        this.planner.deferTask(this.currentTask.name, this.player.playtime + ticks);
+        this.log(`${this.currentTask.name} deferred for ${ticks} ticks: ${reason}`, 'warn', 'task_deferred');
+        this.currentTask.interrupt();
+        this.player.clearPendingAction();
+        this.player.clearWaypoints();
     }
 
     private _pickTask(): BotTask | null {
-        const task = this.planner.pickTask(this.player);
+        const picked = this.planner.pickTask(this.player);
+        const task = picked && this.planner.isDeferred(picked.name, this.player.playtime) ? new IdleTask(30) : picked;
 
         if (task) {
             task.reset();
@@ -419,6 +458,10 @@ export class BotPlayer {
         }
         this.currentTask = next;
         this.movementMonitor.reset(); // clear stuck/oscillation state between tasks
+        this.navigation.reset();
+        this.lastHadWaypoints = false;
+        this.player.clearPendingAction();
+        this.player.clearWaypoints();
     }
 
     private _recordComplete(): void {

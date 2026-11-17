@@ -13,6 +13,7 @@
  * the Uint32Array returned by rsmod pathfinding functions.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import fs from 'fs';
 
 // Pack (level, x, z) into a single 30-bit integer.
@@ -61,7 +62,7 @@ class BotCollisionMapClass {
             count++;
         }
 
-        console.log(`[BotCollisionMap] Loaded ${count.toLocaleString()} unwalkable tiles from ${csvPath}`);
+        BotLog.debug(`[BotCollisionMap] Loaded ${count.toLocaleString()} unwalkable tiles from ${csvPath}`);
     }
 
     /** O(1) check — is this tile listed as unwalkable in the CSV? */

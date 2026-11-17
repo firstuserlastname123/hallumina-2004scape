@@ -38,6 +38,7 @@
  *   getCombatLevel
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import Player from '#/engine/entity/Player.js';
 import Npc from '#/engine/entity/Npc.js';
 import Loc from '#/engine/entity/Loc.js';
@@ -50,7 +51,7 @@ import InvType from '#/cache/config/InvType.js';
 import { getWorld } from '#/engine/bot/BotWorld.js';
 import { botWalkPath, botFindPath } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
-import { trimPathAtCsvBlock, findNearestWalkableTile } from '#/engine/bot/BotNavigation.js';
+import { trimPathAtCsvBlock, findNearestWalkableTile, canBotStep } from '#/engine/bot/BotNavigation.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
 import Obj from '#/engine/entity/Obj.js';
@@ -1764,6 +1765,16 @@ function onSegment(x1: number, z1: number, x2: number, z2: number, x: number, z:
         Math.min(z1, z2) <= z && z <= Math.max(z1, z2);
 }
 
+/** rsmod returns compressed turn points in execution order, with the destination last. */
+function _queueBotPath(player: Player, path: Uint32Array): boolean {
+    const safe = trimPathAtCsvBlock(player.level, path, player.x, player.z);
+    if (safe.length === 0) return false;
+    const end = safe[safe.length - 1];
+    if (((end >> 14) & 0x3fff) === player.x && (end & 0x3fff) === player.z) return false;
+    player.queueWaypoints(safe);
+    return true;
+}
+
 /**
  * Raw pathfinding toward a single tile: accurate → relaxed → swept-angle → naive.
  * Does NOT do gateway or corridor pre-routing.  Call walkTo() for normal movement.
@@ -1792,11 +1803,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
         let path = botWalkPath(player.level, player.x, player.z, destX, destZ);
         if (path.length === 0) path = botFindPath(player.level, player.x, player.z, destX, destZ);
         if (path.length > 0) {
-            const safe = trimPathAtCsvBlock(player.level, path);
-            if (safe.length > 0) {
-                player.queueWaypoints(safe);
-                return;
-            }
+            if (_queueBotPath(player, path)) return;
         }
         // Path is completely blocked — a door or gate is likely in the way.
         // Try opening one within 8 tiles before falling back to the compass sweep.
@@ -1815,11 +1822,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
             let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
             if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
             if (path.length > 0) {
-                const safe = trimPathAtCsvBlock(player.level, path);
-                if (safe.length > 0) {
-                    player.queueWaypoints(safe);
-                    return;
-                }
+                if (_queueBotPath(player, path)) return;
             }
         }
         // Retry with shorter segments in case the 90-tile target is unreachable
@@ -1831,11 +1834,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
             let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
             if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
             if (path.length > 0) {
-                const safe = trimPathAtCsvBlock(player.level, path);
-                if (safe.length > 0) {
-                    player.queueWaypoints(safe);
-                    return;
-                }
+                if (_queueBotPath(player, path)) return;
             }
         }
     }
@@ -1851,11 +1850,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
             let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
             if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
             if (path.length > 0) {
-                const safe = trimPathAtCsvBlock(player.level, path);
-                if (safe.length > 0) {
-                    player.queueWaypoints(safe);
-                    return;
-                }
+                if (_queueBotPath(player, path)) return;
             }
         }
     }
@@ -1863,7 +1858,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
     // Absolute last resort: 1-tile naive step (skip if CSV-blocked)
     const naiveX = player.x + Math.sign(dx);
     const naiveZ = player.z + Math.sign(dz);
-    if (!BotCollisionMap.isCsvBlocked(player.level, naiveX, naiveZ)) {
+    if (canBotStep(player.level, player.x, player.z, naiveX, naiveZ)) {
         player.queueWaypoint(naiveX, naiveZ);
     }
 }
@@ -1883,6 +1878,29 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
  * moveSpeed is INSTANT, permanently blocking headless player movement.
  */
 export function walkTo(player: Player, destX: number, destZ: number, level = 0): void {
+    const bot = (player as any)._bot;
+    if (bot) {
+        const changed = bot.navigation.request(player.x, player.z, player.level, destX, destZ, level, bot.ticksAliveValue);
+        if (changed && !_hasGateInteractionPending(player)) {
+            player.clearWaypoints();
+            player.clearPendingAction();
+        }
+        if (!bot.navigation.canAttempt(bot.ticksAliveValue)) return;
+        if (bot.navigation.isStalled(bot.ticksAliveValue) && !player.delayed && !_hasGateInteractionPending(player)) {
+            player.clearWaypoints();
+            player.clearPendingAction();
+            bot.navigationFailed('no_progress');
+            return;
+        }
+    }
+    _walkTo(player, destX, destZ, level);
+    if (bot && !player.hasWaypoints() && !player.hasInteraction() && !player.delayed &&
+        (player.x !== destX || player.z !== destZ || player.level !== level)) {
+        bot.navigationFailed('path_failed');
+    }
+}
+
+function _walkTo(player: Player, destX: number, destZ: number, level: number): void {
     try {
         const botName = _debugBotName(player);
         if (botName) BotDebugService.noteDestination(botName, destX, destZ, level);
@@ -2294,11 +2312,11 @@ export function interactIF_UseOp(player: Player, intrfce: number, item: number, 
     // jagex has if_button1-5
     const com = Component.get(intrfce);
     if (typeof com === 'undefined') {
-        console.log('Component undefined');
+        BotLog.debug('Component undefined');
         return false;
     }
     if(!com.iop || !com.iop.length) {
-        console.log('Cannot find com.inventoryOptions');
+        BotLog.debug('Cannot find com.inventoryOptions');
         return false;
     }
 
@@ -2310,7 +2328,7 @@ export function interactIF_UseOp(player: Player, intrfce: number, item: number, 
     if(invId == -1) {
         const listener = player.invListeners.find(l => l.com === intrfce);
         if (!listener) {
-            console.log('No listener active');
+            BotLog.debug('No listener active');
             return false;
         }
 
@@ -2320,12 +2338,12 @@ export function interactIF_UseOp(player: Player, intrfce: number, item: number, 
     }
 
     if (!inv || !inv.validSlot(slot) || !inv.hasAt(slot, item)) {
-        console.log('inv or invslot invalid');
+        BotLog.debug('inv or invslot invalid');
         return false;
     }
 
     if (player.delayed) {
-        console.log('Player is busy...');
+        BotLog.debug('Player is busy...');
         return false;
     }
 
@@ -2379,7 +2397,7 @@ export function interactHeldOp(player: Player, inv: Inventory, itemId: number, s
     }
 
     if (op === 1 && itemId === Items.BONES) {
-        console.log('BOT burying bone traditionally:', itemId);
+        BotLog.debug('BOT burying bone traditionally:', itemId);
         return true;
     }
     return true;
@@ -2427,7 +2445,7 @@ export function interactHeldOpU(player: Player, inv: Inventory, itemId: number, 
     player.lastUseItem = useItem;
     player.lastUseSlot = useSlot;
     if (inv.get(slot)?.id !== itemId || inv.get(useSlot)?.id !== useItem) {
-        console.log('Useitem data does not match!', itemId, useItem);
+        BotLog.debug('Useitem data does not match!', itemId, useItem);
         return false;
     }
     const objType = ObjType.get(player.lastItem);
@@ -2806,6 +2824,7 @@ function _findNpc(cx: number, cz: number, level: number, radius: number, predica
             const zone = getWorld().gameMap.getZone(zx, zz, level);
             if (!zone) continue;
             for (const npc of zone.getAllNpcsSafe()) {
+                if (!npc.isActive || npc.level !== level) continue;
                 if (!predicate(npc)) continue;
                 const dist = Math.abs(npc.x - cx) + Math.abs(npc.z - cz);
                 if (dist <= radius * 2 && dist < bestDist) {
@@ -3234,11 +3253,11 @@ export function setVarp(player: Player, varpName: string, varpId: number, varpVa
                 return;
             }
         } else {
-            console.log("Warning: can't find varp name: " + varpName);
+            BotLog.debug("Warning: can't find varp name: " + varpName);
         }
         player.setVar(varp.id, varpValue);
     } else {
-        console.log("Error: can't find varp id: " + varpId);
+        BotLog.debug("Error: can't find varp id: " + varpId);
     }
 }
 

@@ -60,37 +60,29 @@ export function isBotTileBlocked(level: number, x: number, z: number): boolean {
 
 // ── Path trimming ─────────────────────────────────────────────────────────────
 
-/**
- * Remove CSV-blocked destinations from the tail of an rsmod path.
- *
- * rsmod returns paths as Uint32Array where:
- *   path[path.length-1] = first step to execute (closest to src)
- *   path[0]             = destination (furthest from src)
- *
- * We iterate in execution order (length-1 → 0) and truncate the path just
- * before the first CSV-blocked step, returning a path that stops at the
- * last safe destination.
- *
- * The engine's directional collision is already baked into the rsmod path so
- * we only need to apply the CSV layer here.
- */
-export function trimPathAtCsvBlock(level: number, path: Uint32Array): Uint32Array {
+/** Trim compressed rsmod turn points in execution order, including tiles between turns. */
+export function trimPathAtCsvBlock(level: number, path: Uint32Array, srcX: number, srcZ: number): Uint32Array {
     if (path.length === 0 || !BotCollisionMap.isLoaded) return path;
-
-    // Iterate in execution order: from path[path.length-1] towards path[0]
-    for (let i = path.length - 1; i >= 0; i--) {
-        const coord = path[i];
-        const z = coord & 0x3fff;
-        const x = (coord >> 14) & 0x3fff;
-        // level bits in packed coord: (coord >> 28) & 0x3
-        // but rsmod may pack level differently — use the level param instead
-        if (BotCollisionMap.isCsvBlocked(level, x, z)) {
-            // path[i] is blocked — keep only path[i+1 .. path.length-1]
-            if (i + 1 >= path.length) return new Uint32Array(0); // first step blocked
-            return path.slice(i + 1);
+    let x = srcX;
+    let z = srcZ;
+    for (let i = 0; i < path.length; i++) {
+        const nx = (path[i] >> 14) & 0x3fff;
+        const nz = path[i] & 0x3fff;
+        const startX = x;
+        const startZ = z;
+        while (x !== nx || z !== nz) {
+            const tx = x + Math.sign(nx - x);
+            const tz = z + Math.sign(nz - z);
+            if (BotCollisionMap.isCsvBlocked(level, tx, tz)) {
+                const prefix = Array.from(path.slice(0, i));
+                if (x !== startX || z !== startZ) prefix.push((level << 28) | (x << 14) | z);
+                return Uint32Array.from(prefix);
+            }
+            x = tx;
+            z = tz;
         }
     }
-    return path; // no CSV-blocked steps found
+    return path;
 }
 
 // ── Destination validation ────────────────────────────────────────────────────
@@ -167,20 +159,17 @@ export function validateBotPath(level: number, srcX: number, srcZ: number, path:
     let cx = srcX;
     let cz = srcZ;
 
-    // Iterate in execution order: path[length-1] → path[0]
-    for (let i = path.length - 1; i >= 0; i--) {
-        const coord = path[i];
-        const nx = (coord >> 14) & 0x3fff;
-        const nz = coord & 0x3fff;
-
-        const reason = explainBlockedStep(level, cx, cz, nx, nz);
-        if (reason !== 'no_issue') {
-            const stepNum = path.length - i;
-            return `step${stepNum}:(${cx},${cz})->(${nx},${nz}) ${reason}`;
+    for (let i = 0; i < path.length; i++) {
+        const nx = (path[i] >> 14) & 0x3fff;
+        const nz = path[i] & 0x3fff;
+        while (cx !== nx || cz !== nz) {
+            const tx = cx + Math.sign(nx - cx);
+            const tz = cz + Math.sign(nz - cz);
+            const reason = explainBlockedStep(level, cx, cz, tx, tz);
+            if (reason !== 'no_issue') return `waypoint${i + 1}:(${cx},${cz})->(${tx},${tz}) ${reason}`;
+            cx = tx;
+            cz = tz;
         }
-
-        cx = nx;
-        cz = nz;
     }
 
     return 'ok';
@@ -195,146 +184,4 @@ export function canBotTravel(level: number, srcX: number, srcZ: number, destX: n
     return path.length > 0;
 }
 
-// ── BotMovementMonitor ────────────────────────────────────────────────────────
-
-const HISTORY_SIZE = 16;
-const STUCK_THRESHOLD = 10;      // ticks without movement while waypoints active
-const OSCILLATION_MATCH = 3;     // how many consecutive repeated positions = oscillation
-const EDGE_EXPIRY_TICKS = 100;   // ~60 s before a failed edge is reconsidered
-
-/**
- * Per-bot movement state tracker.  One instance per BotPlayer.
- *
- * Call update() once per tick (at the top of BotPlayer.tick()).
- * Check isStuck() / isOscillating() and call clearWaypoints() + resetStuck()
- * when recovery is needed.
- */
-export class BotMovementMonitor {
-    // Rolling position history — each entry is (x<<14)|z (2D, level ignored for cycle detection)
-    private readonly posHistory: number[] = [];
-
-    // How many consecutive ticks the bot had waypoints but didn't move
-    private stuckTicks = 0;
-
-    // Failed edges: key = `${level}_${x}_${z}_${nx}_${nz}`, value = expiry tick
-    private readonly failedEdges: Map<string, number> = new Map();
-
-    /**
-     * Call at the TOP of each BotPlayer.tick() with the bot's current position.
-     *
-     * @param x           Current x (already updated by engine movement this tick)
-     * @param z           Current z
-     * @param hadWaypoints Whether the bot had waypoints at the END of the previous tick
-     * @param moved       True if x/z differs from the previous tick
-     */
-    update(x: number, z: number, hadWaypoints: boolean, moved: boolean): void {
-        // Update position history
-        const packed = (x << 14) | (z & 0x3fff);
-        if (this.posHistory.length >= HISTORY_SIZE) this.posHistory.shift();
-        this.posHistory.push(packed);
-
-        // Stuck tracking: only count when the bot is actively trying to walk
-        if (hadWaypoints) {
-            if (moved) {
-                this.stuckTicks = 0;
-            } else {
-                this.stuckTicks++;
-            }
-        } else {
-            this.stuckTicks = 0;
-        }
-    }
-
-    /** True if the bot has been trying to walk without making progress for too long. */
-    isStuck(): boolean {
-        return this.stuckTicks >= STUCK_THRESHOLD;
-    }
-
-    /** Consecutive ticks the bot has had waypoints but hasn't moved — for debug/observability only. */
-    getStuckTicks(): number {
-        return this.stuckTicks;
-    }
-
-    /**
-     * True if the recent position history shows a repeating cycle.
-     * Detects A→B→A→B (period 2) and A→B→C→A→B→C (period 3) patterns.
-     */
-    isOscillating(): boolean {
-        const h = this.posHistory;
-        const len = h.length;
-        if (len < 6) return false;
-
-        // Period-2 check: h[n] == h[n-2] for OSCILLATION_MATCH consecutive pairs
-        let p2 = 0;
-        for (let i = len - 1; i >= 2; i--) {
-            if (h[i] === h[i - 2]) {
-                p2++;
-                if (p2 >= OSCILLATION_MATCH) return true;
-            } else {
-                break;
-            }
-        }
-
-        // Period-3 check: h[n] == h[n-3] for OSCILLATION_MATCH consecutive
-        let p3 = 0;
-        for (let i = len - 1; i >= 3; i--) {
-            if (h[i] === h[i - 3]) {
-                p3++;
-                if (p3 >= OSCILLATION_MATCH) return true;
-            } else {
-                break;
-            }
-        }
-
-        return false;
-    }
-
-    /** Reset the stuck counter after applying recovery. */
-    resetStuck(): void {
-        this.stuckTicks = 0;
-    }
-
-    /** Reset the position history after applying oscillation recovery. */
-    resetOscillation(): void {
-        this.posHistory.length = 0;
-        this.stuckTicks = 0;
-    }
-
-    // ── Failed-edge cache ─────────────────────────────────────────────────────
-
-    /**
-     * Record that a step from (x,z) → (nx,nz) failed at currentTick.
-     * The edge is remembered for EDGE_EXPIRY_TICKS before being reconsidered
-     * (so dynamic objects like doors can reopen).
-     */
-    addFailedEdge(level: number, x: number, z: number, nx: number, nz: number, currentTick: number): void {
-        const key = `${level}_${x}_${z}_${nx}_${nz}`;
-        this.failedEdges.set(key, currentTick + EDGE_EXPIRY_TICKS);
-
-        // Prune expired entries to keep the map bounded
-        if (this.failedEdges.size > 64) {
-            for (const [k, expiry] of this.failedEdges) {
-                if (currentTick >= expiry) this.failedEdges.delete(k);
-            }
-        }
-    }
-
-    /** True if this edge was recently recorded as failed and hasn't expired. */
-    isEdgeFailed(level: number, x: number, z: number, nx: number, nz: number, currentTick: number): boolean {
-        const key = `${level}_${x}_${z}_${nx}_${nz}`;
-        const expiry = this.failedEdges.get(key);
-        if (expiry === undefined) return false;
-        if (currentTick >= expiry) {
-            this.failedEdges.delete(key);
-            return false;
-        }
-        return true;
-    }
-
-    /** Full reset — call when the bot changes destination or task. */
-    reset(): void {
-        this.posHistory.length = 0;
-        this.stuckTicks = 0;
-        this.failedEdges.clear();
-    }
-}
+export { BotMovementMonitor } from '#/engine/bot/BotMovementMonitor.js';

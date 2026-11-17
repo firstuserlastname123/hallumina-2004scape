@@ -23,6 +23,7 @@
  * The interactLoc call is still made first for animation/visual fidelity.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Loc,
@@ -458,7 +459,7 @@ export class RunecraftingTask extends BotTask {
         this.lastLogKey  = logKey;
         this.lastLogTime = now;
         const prefix = player ? `[P:${player.x},${player.z}]` : '[BOT]';
-        console.log(`${prefix} [RunecraftingTask] ${msg}`);
+        BotLog.debug(`${prefix} [RunecraftingTask] ${msg}`);
     }
 
     /**

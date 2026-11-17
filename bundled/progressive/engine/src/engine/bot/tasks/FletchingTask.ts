@@ -27,6 +27,7 @@
  * routed to by BotGoalPlanner._findStringingTask().
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import LocType from '#/cache/config/LocType.js';
 import {
     BotTask, Player, Loc, InvType,
@@ -95,7 +96,7 @@ export class FletchingTask extends BotTask {
         if (!hasHatchetInv && !hasHatchetBank) return false;
 
         if (!hasItem(player, Items.KNIFE) && !this._knifeInBank(player)) {
-            console.log(`[Fletch:${player.username}] shouldRun=false: no knife`);
+            BotLog.debug(`[Fletch:${player.username}] shouldRun=false: no knife`);
             return false;
         }
 
@@ -187,7 +188,7 @@ export class FletchingTask extends BotTask {
                 const wcLevel = getBaseLevel(player, PlayerStat.WOODCUTTING);
                 this.wcStep = getWoodcuttingStepForLog(this.step.itemConsumed!, wcLevel);
                 if (!this.wcStep) {
-                    console.log(`[Fletch:${player.username}] no WC step for log ${this.step.itemConsumed} at wc=${wcLevel}`);
+                    BotLog.debug(`[Fletch:${player.username}] no WC step for log ${this.step.itemConsumed} at wc=${wcLevel}`);
                     this.cooldown = 10;
                     return;
                 }
@@ -216,7 +217,7 @@ export class FletchingTask extends BotTask {
                 if (!tree) {
                     this.scanFailTicks++;
                     if (this.scanFailTicks === 1) {
-                        console.log(`[Fletch:${player.username}] No '${this._treePrefix()}' tree near (${player.x},${player.z})`);
+                        BotLog.debug(`[Fletch:${player.username}] No '${this._treePrefix()}' tree near (${player.x},${player.z})`);
                     }
                     if (this.scanFailTicks > 10) {
                         const [lx, lz] = this.wcStep!.location;
@@ -241,7 +242,7 @@ export class FletchingTask extends BotTask {
                     walkTo(player, tx, tz);
                     this.approachTicks++;
                     if (this.approachTicks > 30) {
-                        console.log(`[Fletch:${player.username}] Can't reach tree at (${tree.x},${tree.z}), retrying`);
+                        BotLog.debug(`[Fletch:${player.username}] Can't reach tree at (${tree.x},${tree.z}), retrying`);
                         this._releaseTree();
                         this.approachTicks = 0;
                         const [lx, lz] = this.wcStep!.location;
@@ -338,7 +339,7 @@ export class FletchingTask extends BotTask {
                     // dialog was open) — fall back to a manual conversion so bots
                     // don't stall forever, but log it since it means the real
                     // server-side path is broken and needs another look.
-                    console.log(`[Fletch:${player.username}] fletch_dialog timeout (comName=${comName}) — manual fallback`);
+                    BotLog.debug(`[Fletch:${player.username}] fletch_dialog timeout (comName=${comName}) — manual fallback`);
                     this._fletchManually(player);
                     this.dialogWaitTicks = 0;
                     this.state           = 'fletch';
@@ -402,7 +403,7 @@ export class FletchingTask extends BotTask {
         const better = getBestFletchStepForLog(bestLog, fletchLevel);
         if (!better || better.action === this.step.action) return;
 
-        console.log(`[Fletch:${player.username}] retargeting ${this.step.action} -> ${better.action} (wc=${wcLevel}, fletch=${fletchLevel})`);
+        BotLog.debug(`[Fletch:${player.username}] retargeting ${this.step.action} -> ${better.action} (wc=${wcLevel}, fletch=${fletchLevel})`);
         this.step = better;
         this._resetWcState();
     }
@@ -531,7 +532,7 @@ export class FletchingTask extends BotTask {
         removeItem(player, logId, 1);
         addItem(player, productId, count);
         addXp(player, PlayerStat.FLETCHING, this.step.xpPerAction);
-        console.log(`[Fletch:${player.username}] _fletchManually: +${this.step.xpPerAction} XP product=${productId}x${count}`);
+        BotLog.debug(`[Fletch:${player.username}] _fletchManually: +${this.step.xpPerAction} XP product=${productId}x${count}`);
         this.watchdog.notifyActivity();
         this.lastCount = countItem(player, productId);
     }

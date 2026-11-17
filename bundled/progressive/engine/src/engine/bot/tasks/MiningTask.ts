@@ -2,6 +2,7 @@
  * MiningTask.ts — Mine rocks, bank ore, progress through tiers.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -389,7 +390,7 @@ export class MiningTask extends BotTask {
             const moved = inv.remove(item.id, item.count);
             if (moved.completed > 0) bank.add(item.id, moved.completed);
         }
-        console.log(`[MG:${player.username}] Deposited ORES into the bank.`);
+        BotLog.debug(`[MG:${player.username}] Deposited ORES into the bank.`);
     }
 
     // ── Stuck handling (WC-style upgrade) ──────────────────────────────────

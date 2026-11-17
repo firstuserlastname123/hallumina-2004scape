@@ -14,6 +14,7 @@
  * not here. The planner is stateless about which skill was last chosen.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import Player from '#/engine/entity/Player.js';
 import { PlayerStat, getBaseLevel, hasItem, countItem, isInventoryFull } from '#/engine/bot/BotAction.js';
 import { Items, Locations, SkillProgression, getProgressionStep, getWoodcuttingStepForLog } from '#/engine/bot/BotKnowledge.js';
@@ -204,13 +205,28 @@ export class BotGoalPlanner {
     // Counts pickTask calls remaining before bankstand is eligible again.
     // Initialised with a random offset so bots don't all bankstand at once.
     private bankstandCooldown = Math.floor(Math.random() * 20) + 10;
+    private readonly deferredUntil = new Map<string, number>();
+
+    deferTask(name: string, untilTick: number): void {
+        this.deferredUntil.set(name.split(':')[0], untilTick);
+    }
+
+    isDeferred(name: string, tick: number): boolean {
+        name = name.split(':')[0];
+        const until = this.deferredUntil.get(name);
+        if (until === undefined) return false;
+        if (tick < until) return true;
+        this.deferredUntil.delete(name);
+        return false;
+    }
 
     constructor(personality: BotPersonality = Personalities.BALANCED) {
         this.personality = personality;
     }
 
     pickTask(player: Player): BotTask | null {
-        const task = this._pickTaskInternal(player);
+        const picked = this._pickTaskInternal(player);
+        const task = picked && this.isDeferred(picked.name, player.playtime) ? new IdleTask(30) : picked;
         if (BotDebugService.enabled) {
             try {
                 this._recordDecision(player, task);
@@ -325,7 +341,7 @@ export class BotGoalPlanner {
         if ((this.personality.weights['SMITHING'] ?? 0) > 0) {
             const smithTask = this._findSmithingTask(player);
             if (smithTask) return smithTask;
-            console.log(`[Planner] ${player.username} SMITHING skipped: no smithTask (ores/bars?)`);
+            BotLog.debug(`[Planner] ${player.username} SMITHING skipped: no smithTask (ores/bars?)`);
         }
 
         // ── LOGS priority: 50/50 split between Firemaking and Fletching ──────
@@ -420,9 +436,9 @@ export class BotGoalPlanner {
                 let toolOk: boolean;
                 if (step.action.startsWith('fletch_')) {
                     toolOk = this._hasKnifeAccessible(player);
-                    console.log(`[Planner:${player.username}] FLETCHING weighted-loop step=${step.action} knifeOk=${toolOk}`);
+                    BotLog.debug(`[Planner:${player.username}] FLETCHING weighted-loop step=${step.action} knifeOk=${toolOk}`);
                     if (!toolOk) {
-                        console.log(`[Planner:${player.username}] FLETCH→PickupSpawn (knife gone)`);
+                        BotLog.debug(`[Planner:${player.username}] FLETCH→PickupSpawn (knife gone)`);
                         return new PickupSpawnTask(Items.KNIFE, KNIFE_SPAWNS);
                     }
                 } else if (skillName === 'FLETCHING' && step.action.startsWith('string_')) {
@@ -465,13 +481,13 @@ export class BotGoalPlanner {
                         if (skillName === 'FIREMAKING') {
                             const wcLevel = getBaseLevel(player, PlayerStat.WOODCUTTING);
                             const wcStep = getWoodcuttingStepForLog(step.itemConsumed!, wcLevel);
-                            console.log(`[Planner:${player.username}] FIREMAKING no logs(id=${step.itemConsumed}) → wcStep=${wcStep ? wcStep.action : 'null'}`);
+                            BotLog.debug(`[Planner:${player.username}] FIREMAKING no logs(id=${step.itemConsumed}) → wcStep=${wcStep ? wcStep.action : 'null'}`);
                             if (wcStep) {
                                 return new WoodcuttingTask(wcStep);
                             }
                         } else if (skillName === 'FLETCHING') {
                             // FletchingTask handles its own log acquisition via embedded woodcutting
-                            console.log(`[Planner:${player.username}] FLETCHING no logs → FletchingTask (self-contained WC)`);
+                            BotLog.debug(`[Planner:${player.username}] FLETCHING no logs → FletchingTask (self-contained WC)`);
                             return new FletchingTask(step);
                         }
 
@@ -521,10 +537,10 @@ export class BotGoalPlanner {
                                 }
                             }
                         }
-                        console.log(`[Planner:${player.username}] FLETCH weighted-loop logs=${totalLogs} (id=${step.itemConsumed}) step=${step.action}`);
-                        if (totalLogs < 10) { console.log(`[Planner:${player.username}] FLETCH skip: only ${totalLogs} logs`); continue; }
+                        BotLog.debug(`[Planner:${player.username}] FLETCH weighted-loop logs=${totalLogs} (id=${step.itemConsumed}) step=${step.action}`);
+                        if (totalLogs < 10) { BotLog.debug(`[Planner:${player.username}] FLETCH skip: only ${totalLogs} logs`); continue; }
                     }
-                    console.log(`[Planner:${player.username}] FLETCH→FletchingTask (weighted-loop) step=${step.action}`);
+                    BotLog.debug(`[Planner:${player.username}] FLETCH→FletchingTask (weighted-loop) step=${step.action}`);
                     return new FletchingTask(step);
                 }
                 continue;
@@ -563,6 +579,7 @@ export class BotGoalPlanner {
      * as the bot has caught anything.
      */
     private _findCookingTask(player: Player): CookingTask | null {
+        if (this.isDeferred('Cook', player.playtime)) return null;
         const bid = bankInvId();
         const bank = bid !== -1 ? player.getInventory(bid) : null;
         const level = getBaseLevel(player, PlayerStat.COOKING);
@@ -603,6 +620,7 @@ export class BotGoalPlanner {
      * Furnace mode (smelt action) requires ores in inventory.
      */
     private _findSmithingTask(player: Player): SmithingTask | null {
+        if (this.isDeferred('Smith', player.playtime)) return null;
         const bid = bankInvId();
         const bank = bid !== -1 ? player.getInventory(bid) : null;
         const level = getBaseLevel(player, PlayerStat.SMITHING);
@@ -665,6 +683,7 @@ export class BotGoalPlanner {
      * Returns null when nothing above can run right now.
      */
     private _findCraftingTask(player: Player): BotTask | null {
+        if (this.isDeferred('Crafting', player.playtime)) return null;
         const mineLevel = getBaseLevel(player, PlayerStat.MINING);
         const smithLevel = getBaseLevel(player, PlayerStat.SMITHING);
         const phase2Unlocked = mineLevel >= 40 && smithLevel >= 40;
@@ -786,6 +805,7 @@ export class BotGoalPlanner {
      * on maple. Returns null when no string_ step has both materials ready.
      */
     private _findStringingTask(player: Player): BowStringingTask | null {
+        if (this.isDeferred('BowStringing', player.playtime)) return null;
         const level = getBaseLevel(player, PlayerStat.FLETCHING);
         const steps = SkillProgression['FLETCHING'].filter(s => s.action.startsWith('string_') && level >= s.minLevel && level <= s.maxLevel);
 
@@ -866,8 +886,8 @@ export class BotGoalPlanner {
      * (< 10) so the weighted loop handles gathering and the FM woodcutting fallback.
      */
     private _findLogsTask(player: Player): BotTask | null {
-        const fmWeight = this.personality.weights['FIREMAKING'] ?? 0;
-        const fletchWeight = this.personality.weights['FLETCHING'] ?? 0;
+        const fmWeight = this.isDeferred('Firemaking', player.playtime) ? 0 : this.personality.weights['FIREMAKING'] ?? 0;
+        const fletchWeight = this.isDeferred('Fletching', player.playtime) ? 0 : this.personality.weights['FLETCHING'] ?? 0;
 
         const fmStep = fmWeight > 0 ? getProgressionStep('FIREMAKING', getBaseLevel(player, PlayerStat.FIREMAKING)) : null;
         const fletchStep = fletchWeight > 0 ? getProgressionStep('FLETCHING', getBaseLevel(player, PlayerStat.FLETCHING)) : null;
@@ -899,16 +919,16 @@ export class BotGoalPlanner {
             fletchLogId !== -1 &&
             totalLogs(fletchLogId) >= 10;
 
-        console.log(`[Planner:${player.username}] _findLogsTask fmAvail=${fmAvail}(logId=${fmLogId},n=${totalLogs(fmLogId)}) fletchAvail=${fletchAvail}(logId=${fletchLogId},n=${totalLogs(fletchLogId)})`);
+        BotLog.debug(`[Planner:${player.username}] _findLogsTask fmAvail=${fmAvail}(logId=${fmLogId},n=${totalLogs(fmLogId)}) fletchAvail=${fletchAvail}(logId=${fletchLogId},n=${totalLogs(fletchLogId)})`);
 
         if (!fmAvail && !fletchAvail) return null;
 
         const doFletching = (): BotTask => {
             if (!this._hasKnifeAccessible(player)) {
-                console.log(`[Planner:${player.username}] FLETCH→PickupSpawn (no knife)`);
+                BotLog.debug(`[Planner:${player.username}] FLETCH→PickupSpawn (no knife)`);
                 return new PickupSpawnTask(Items.KNIFE, KNIFE_SPAWNS);
             }
-            console.log(`[Planner:${player.username}] FLETCH→FletchingTask step=${fletchStep!.action}`);
+            BotLog.debug(`[Planner:${player.username}] FLETCH→FletchingTask step=${fletchStep!.action}`);
             return new FletchingTask(fletchStep!);
         };
 
@@ -917,11 +937,11 @@ export class BotGoalPlanner {
                 const total = fmWeight + fletchWeight;
                 if (Math.random() >= fmWeight / total) {
                     // FletchingTask handles its own WC when logs are low
-                    console.log(`[Planner:${player.username}] FLETCH→FletchingTask (self-contained WC, fmAvail but fletchAvail=false)`);
+                    BotLog.debug(`[Planner:${player.username}] FLETCH→FletchingTask (self-contained WC, fmAvail but fletchAvail=false)`);
                     return doFletching();
                 }
             }
-            console.log(`[Planner:${player.username}] FLETCH→FM (only fmAvail)`);
+            BotLog.debug(`[Planner:${player.username}] FLETCH→FM (only fmAvail)`);
             return new FiremakingTask(fmStep!);
         }
         if (!fmAvail && fletchAvail) return doFletching();
@@ -944,6 +964,9 @@ export class BotGoalPlanner {
                 w &&
                 w > 0 &&
                 SKILLS_WITH_CONTENT.has(skill) &&
+                !this.isDeferred(({ ATTACK: 'Combat', STRENGTH: 'Combat', DEFENCE: 'Combat', RANGED: 'RangedMagic', MAGIC: 'RangedMagic',
+                    RUNECRAFT: 'Runecrafting', MINING: 'Mine', FISHING: 'Fish', WOODCUTTING: 'Woodcut', COOKING: 'Cook', SMITHING: 'Smith', THIEVING: 'Thieve' } as Record<string, string>)[skill]
+                    ?? skill[0] + skill.slice(1).toLowerCase(), player.playtime) &&
                 (() => {
                     const stat = SKILL_STAT[skill];
                     return stat !== undefined && getBaseLevel(player, stat) < 99;

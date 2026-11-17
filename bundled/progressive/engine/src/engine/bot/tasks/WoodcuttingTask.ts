@@ -15,6 +15,7 @@
  *   - Level-up upgrades step and re-walks to new area.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import LocType from '#/cache/config/LocType.js';
 import {
     BotTask, Player, Loc, InvType,
@@ -216,7 +217,7 @@ export class WoodcuttingTask extends BotTask {
             if (!tree) {
                 this.scanFailTicks++;
                 if (this.scanFailTicks === 1) {
-                    console.log(`[WC:${player.username}] No '${this._treePrefix()}' tree near (${player.x},${player.z})`);
+                    BotLog.debug(`[WC:${player.username}] No '${this._treePrefix()}' tree near (${player.x},${player.z})`);
                 }
                 if (this.scanFailTicks > 10) {
                     // Wander within tree area and try again
@@ -232,7 +233,7 @@ export class WoodcuttingTask extends BotTask {
 
             if (isAdjacentToLoc(player, tree)) {
                 // Already adjacent — interact immediately
-                console.log(`[WC:${player.username}] Adjacent to '${this._treePrefix()}' at (${tree.x},${tree.z}), interacting`);
+                BotLog.debug(`[WC:${player.username}] Adjacent to '${this._treePrefix()}' at (${tree.x},${tree.z}), interacting`);
                 interactLoc(player, tree);
                 this.state         = 'interact';
                 this.interactTicks = 0;
@@ -245,7 +246,7 @@ export class WoodcuttingTask extends BotTask {
                 this.approachTicks++;
                 if (this.approachTicks > 30) {
                     // Can't reach this tree — try another
-                    console.log(`[WC:${player.username}] Can't reach tree at (${tree.x},${tree.z}), retrying`);
+                    BotLog.debug(`[WC:${player.username}] Can't reach tree at (${tree.x},${tree.z}), retrying`);
                     this._releaseTree();
                     this.approachTicks = 0;
                     const [lx, lz] = this.step.location;
@@ -267,7 +268,7 @@ export class WoodcuttingTask extends BotTask {
             this.interactTicks++;
 
             if (player.stats[PlayerStat.WOODCUTTING] > this.lastXp) {
-                console.log(`[WC:${player.username}] XP gained! total=${player.stats[PlayerStat.WOODCUTTING]}`);
+                BotLog.debug(`[WC:${player.username}] XP gained! total=${player.stats[PlayerStat.WOODCUTTING]}`);
                 this.lastXp        = player.stats[PlayerStat.WOODCUTTING];
                 this.interactTicks = 0;
                 this.watchdog.notifyActivity();
@@ -277,7 +278,7 @@ export class WoodcuttingTask extends BotTask {
 
             if (this.interactTicks >= INTERACT_TIMEOUT) {
                 // Tree depleted or interaction was cleared — find another
-                console.log(`[WC:${player.username}] Interact timeout, rescanning`);
+                BotLog.debug(`[WC:${player.username}] Interact timeout, rescanning`);
                 this.state        = 'approach';
                 this._releaseTree();
                 this.interactTicks = 0;
@@ -430,7 +431,7 @@ export class WoodcuttingTask extends BotTask {
                 }
             }
         }
-        console.log(`[WC:${player.username}] Deposited logs into the bank.`);
+        BotLog.debug(`[WC:${player.username}] Deposited logs into the bank.`);
     }
 
 

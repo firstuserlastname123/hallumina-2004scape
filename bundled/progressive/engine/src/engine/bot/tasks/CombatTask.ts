@@ -54,6 +54,7 @@ import { Interfaces, GRIMY_HERB_MAP } from '#/engine/bot/BotKnowledge.js';
 import ObjType from '#/cache/config/ObjType.js';
 import type { BotTaskDebugInfo } from '#/engine/bot/debug/BotDebugTypes.js';
 import { PlayerStatNameMap } from '#/engine/entity/PlayerStat.js';
+import { BotLog } from '#/engine/bot/BotLog.js';
 
 // ── Shared NPC claim registry ─────────────────────────────────────────────────
 // Module-level set of NPC keys currently targeted by any CombatTask instance.
@@ -151,6 +152,9 @@ export class CombatTask extends BotTask {
 
     /** Cached from the last tick so reset() can unequip armor without a player parameter. */
     private _lastPlayer: Player | null = null;
+    private readonly unreachableNpcs = new Map<number, number>();
+    private noProgressTicks = 0;
+    private lastCombatXp = -1;
 
     constructor(step: SkillStep, stat: PlayerStat) {
         super('Combat');
@@ -163,20 +167,9 @@ export class CombatTask extends BotTask {
     // ─────────────────────────────────────────────
     // LOGGING
     // ─────────────────────────────────────────────
-    private lastLogKey = '';
-    private lastLogTime = 0;
-
-    private _log(player: Player | null, msg: string, key?: string): void {
-        const now = Date.now();
-        const logKey = key ?? msg;
-
-        if (this.lastLogKey === logKey && now - this.lastLogTime < 750) return;
-
-        this.lastLogKey = logKey;
-        this.lastLogTime = now;
-
-        const prefix = player ? `[P:${player.x},${player.z}]` : '[BOT]';
-        console.log(`${prefix} [CombatTask] ${msg}`);
+    private _log(player: Player | null, msg: string, key = 'detail'): void {
+        if (/timeout/i.test(msg)) BotLog.count('timeouts');
+        BotLog.event('debug', player?.username ?? 'Combat', key, msg);
     }
 
     shouldRun(player: Player): boolean {
@@ -190,6 +183,15 @@ export class CombatTask extends BotTask {
         if (this.interrupted) return;
 
         const banking = this.state === 'bank_walk' || this.state === 'bank_deposit';
+        const combatXp = player.stats[PlayerStat.ATTACK] + player.stats[PlayerStat.STRENGTH] + player.stats[PlayerStat.DEFENCE];
+        if (combatXp !== this.lastCombatXp) this.noProgressTicks = 0;
+        this.lastCombatXp = combatXp;
+        if (!banking && ++this.noProgressTicks >= 300) {
+            this._releaseNpc();
+            (player as any)._bot?.deferCurrentTask('no combat progress after target retries');
+            this.interrupt();
+            return;
+        }
 
         if (this.watchdog.check(player, banking)) {
             player.clearWaypoints();
@@ -729,6 +731,22 @@ export class CombatTask extends BotTask {
                 return;
             }
 
+            // Do not reset the approach budget on every re-engage. Otherwise the
+            // 12-tick re-engage branch prevents the 20-tick timeout ever firing.
+            if (this.approachTicks >= INTERACT_TIMEOUT && this.currentNpc && !isNear(player, this.currentNpc.x, this.currentNpc.z, 1, this.currentNpc.level)) {
+                this.unreachableNpcs.set(this.currentNpc.nid, player.playtime + 100);
+                if (this.unreachableNpcs.size > 64) this.unreachableNpcs.delete(this.unreachableNpcs.keys().next().value!);
+                BotLog.event('warn', player.username, 'target_unreachable', `Combat approach timed out for NPC ${this.currentNpc.nid}; selecting another target`);
+                this._releaseNpc();
+                this.currentNpc = null;
+                player.clearPendingAction();
+                player.clearWaypoints();
+                this.state = 'scan';
+                this.approachTicks = 0;
+                this.interactTicks = 0;
+                return;
+            }
+
             if (this.interactTicks >= this.noAttackTimeoutTicks) {
                 if (this.currentNpc && this._isNpcAlive(player, this.currentNpc)) {
                     // NPC is alive but we haven't landed a hit — a gate or door may be
@@ -748,7 +766,6 @@ export class CombatTask extends BotTask {
                     setCombatStyle(player, TRAIN_CYCLE[this.trainIndex].style);
                     interactNpcOp(player, this.currentNpc, 2);
                     this.interactTicks = 0;
-                    this.approachTicks = 0;
                     return;
                 }
                 // NPC is gone — stop waiting and scan for another target.
@@ -762,7 +779,7 @@ export class CombatTask extends BotTask {
                 return;
             }
 
-            if (this.approachTicks >= INTERACT_TIMEOUT) {
+            if (this.approachTicks >= INTERACT_TIMEOUT && !player.hasInteraction()) {
                 if (openNearbyGate(player, 30)) {
                     this.approachTicks = 0;
                     this.cooldown = 4;
@@ -830,6 +847,9 @@ export class CombatTask extends BotTask {
         this.lastXp = 0;
         this.scanFail = 0;
         this.currentNpc = null;
+        this.unreachableNpcs.clear();
+        this.noProgressTicks = 0;
+        this.lastCombatXp = -1;
         this.intentCooldown = 0;
 
         this.trainIndex = 0;
@@ -864,6 +884,11 @@ export class CombatTask extends BotTask {
      *   - not already claimed by another CombatTask bot
      */
     private _isNpcAvailable(npc: Npc): boolean {
+        const until = this.unreachableNpcs.get(npc.nid);
+        if (until !== undefined) {
+            if ((this._lastPlayer?.playtime ?? 0) < until) return false;
+            this.unreachableNpcs.delete(npc.nid);
+        }
         // Skip NPCs that already have a combat target (being fought by someone else)
         if ((npc as any).target !== null && (npc as any).target !== undefined) return false;
         // Skip NPCs already claimed by another bot this tick
@@ -1034,9 +1059,9 @@ export class CombatTask extends BotTask {
 
             if (interactIF_UseOp(player, Interfaces.SHOP_SIDE_INV, item.id, slot, 4)) {
                 //info: Op 4 is sell 10 (Op1 value, op2 sell 1, op3 sell 5, op4 sell 10)(for SHOP_SIDE) Interfaces.SHOP_INV for buy
-                console.log('(' + player.displayName + ') successfully sold item to shop: ' + item.id);
+                BotLog.debug('(' + player.displayName + ') successfully sold item to shop: ' + item.id);
             } else {
-                console.log('Could not sell item to shop! (' + item.id + ') for (' + player.displayName + ')');
+                BotLog.debug('Could not sell item to shop! (' + item.id + ') for (' + player.displayName + ')');
             }
             //todo: check if more than 10 and repeat interfaceIF_UseOp
         }

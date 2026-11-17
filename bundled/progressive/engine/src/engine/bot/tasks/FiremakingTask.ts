@@ -1,3 +1,4 @@
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -134,9 +135,9 @@ private spawnFire(player: Player): void {
 
         World.addLoc(fire, FiremakingTask.FIRE_DURATION);
 
-        console.log(`[Firemaking] 🔥 spawned REAL fire at ${player.x},${player.z}`);
+        BotLog.debug(`[Firemaking] 🔥 spawned REAL fire at ${player.x},${player.z}`);
     } catch (err) {
-        console.log('[Firemaking] ❌ failed to spawn fire', err);
+        BotLog.debug('[Firemaking] ❌ failed to spawn fire', err);
     }
 }
 
@@ -164,7 +165,7 @@ private spawnFire(player: Player): void {
         const newStep = getProgressionStep('FIREMAKING', level);
 
         if (newStep && newStep.minLevel > this.step.minLevel) {
-            console.log(`[Firemaking] 📈 Step upgrade`);
+            BotLog.debug(`[Firemaking] 📈 Step upgrade`);
             this.step = newStep;
             this.resetLoop();
         }
@@ -175,7 +176,7 @@ private spawnFire(player: Player): void {
         // would walk straight out to 'burn' and silently stall forever there
         // (see the o_slot === null guard below).
         if ((!this.hasLogs(player) || !hasItem(player, Items.TINDERBOX)) && !banking) {
-            console.log(`[Firemaking] 📦 No logs or no tinderbox → bank`);
+            BotLog.debug(`[Firemaking] 📦 No logs or no tinderbox → bank`);
             this.state = 'bank_walk';
         }
 
@@ -189,7 +190,7 @@ private spawnFire(player: Player): void {
                 return;
             }
 
-            console.log(`[Firemaking] 🏦 Arrived bank`);
+            BotLog.debug(`[Firemaking] 🏦 Arrived bank`);
             this.state = 'bank';
             return;
         }
@@ -224,7 +225,7 @@ private spawnFire(player: Player): void {
                     break;
                 }
                 if (!hasItem(player, Items.TINDERBOX)) {
-                    console.log(`[Firemaking] 🛒 No tinderbox in bank → shop trip to Lumbridge General`);
+                    BotLog.debug(`[Firemaking] 🛒 No tinderbox in bank → shop trip to Lumbridge General`);
                     this.state = 'shop_walk';
                     this.shopWaitTicks = 0;
                     return;
@@ -245,7 +246,7 @@ private spawnFire(player: Player): void {
                     break;
                 }
                 if (!withdrew) {
-                    console.log(`[Firemaking] ❌ No correct logs in bank → STOP`);
+                    BotLog.debug(`[Firemaking] ❌ No correct logs in bank → STOP`);
                     this.interrupt();
                     return;
                 }
@@ -284,7 +285,7 @@ private spawnFire(player: Player): void {
             }
 
             if (countItem(player, Items.COINS) < TINDERBOX_COST) {
-                console.log(`[Firemaking] ❌ Can't afford a tinderbox (need ${TINDERBOX_COST}gp) → STOP`);
+                BotLog.debug(`[Firemaking] ❌ Can't afford a tinderbox (need ${TINDERBOX_COST}gp) → STOP`);
                 this.interrupt();
                 return;
             }
@@ -298,7 +299,7 @@ private spawnFire(player: Player): void {
                 return;
             }
 
-            console.log(`[Firemaking] 🛒 Bought a tinderbox`);
+            BotLog.debug(`[Firemaking] 🛒 Bought a tinderbox`);
             // Route back through 'bank_walk' (not straight to 'bank') — the
             // bot is standing at Lumbridge General here, not at a bank, and
             // 'bank_walk' is what actually walks it to the nearest one before
@@ -317,7 +318,7 @@ private spawnFire(player: Player): void {
                 return;
             }
 
-            console.log(`[Firemaking] 🔥 Arrived fire area`);
+            BotLog.debug(`[Firemaking] 🔥 Arrived fire area`);
             this.state = 'burn';
             return;
         }
@@ -328,7 +329,7 @@ private spawnFire(player: Player): void {
             const logId = this.getFirstLog(player);
             const inv = player.getInventory(InvType.INV);
             if (!logId) {
-                console.log('[Firemaking] 📦 out of logs');
+                BotLog.debug('[Firemaking] 📦 out of logs');
                 this.state = 'bank_walk';
                 return;
             }
@@ -343,7 +344,7 @@ private spawnFire(player: Player): void {
                 // catch a missing tinderbox before we ever get here, but if a
                 // tinderbox is somehow lost mid-task, don't silently stall
                 // forever: go get another instead.
-                console.log('[Firemaking] 🔥❌ no tinderbox in hand → bank');
+                BotLog.debug('[Firemaking] 🔥❌ no tinderbox in hand → bank');
                 this.state = 'bank_walk';
                 return;
             }
@@ -367,7 +368,7 @@ private spawnFire(player: Player): void {
             if (player.stats[PlayerStat.FIREMAKING] > this.xpBeforeBurn) {
                 this.lastXp = player.stats[PlayerStat.FIREMAKING];
                 this.watchdog.notifyActivity();
-                console.log(`[Firemaking] 🔥 log burned (real XP confirmed, total=${this.lastXp})`);
+                BotLog.debug(`[Firemaking] 🔥 log burned (real XP confirmed, total=${this.lastXp})`);
                 this.cooldown = randInt(2, 12);
                 this.state = 'move';
                 return;
@@ -381,7 +382,7 @@ private spawnFire(player: Player): void {
                 // would get nothing for a failed/incomplete attempt. The log
                 // was already dropped by light_logs_inv regardless, so just
                 // move on and try the next one.
-                console.log('[Firemaking] 🔥 no XP confirmed in time — moving on');
+                BotLog.debug('[Firemaking] 🔥 no XP confirmed in time — moving on');
                 this.cooldown = randInt(2, 12);
                 this.state = 'move';
             }
@@ -431,7 +432,7 @@ private spawnFire(player: Player): void {
         }
 
         if (this.stuck.desperatelyStuck) {
-            console.log(`[Firemaking] 🌀 teleport escape`);
+            BotLog.debug(`[Firemaking] 🌀 teleport escape`);
             teleportNear(player, x, z);
             this.stuck.reset();
             return;

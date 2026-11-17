@@ -13,6 +13,7 @@
  * Stop condition: HP too low → switch to other task or heal.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
     Player,
@@ -87,7 +88,7 @@ export class ThievingTask extends BotTask {
     }
 
     private debug(player: Player, message: string): void {
-        console.log(`[ThievingTask][${player.username}][${this.state}] ${message}`);
+        BotLog.debug(`[ThievingTask][${player.username}][${this.state}] ${message}`);
     }
 
     // ── Task lifecycle ───────────────────────────────────────────────────────

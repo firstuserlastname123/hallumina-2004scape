@@ -9,6 +9,7 @@
  * hunting area — this bot goes deep, not shallow-ditch.
  */
 
+import { BotLog } from '#/engine/bot/BotLog.js';
 import Player, { getExpByLevel } from '#/engine/entity/Player.js';
 import ObjType from '#/cache/config/ObjType.js';
 import {
@@ -518,7 +519,7 @@ export class PKerTask extends BotTask {
 
         const [zx, zz] = this._currentZoneCoords();
         teleportNear(player, zx, zz);
-        console.log(`[PKerTask] ${player.displayName} profile=${p.name} cb=${player.combatLevel} zone=${zx},${zz}`);
+        BotLog.debug(`[PKerTask] ${player.displayName} profile=${p.name} cb=${player.combatLevel} zone=${zx},${zz}`);
         this.state    = 'walk';
         this.cooldown = randInt(2, 4);
     }
