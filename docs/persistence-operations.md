@@ -27,13 +27,34 @@ The serialized bytes and `.sav` filename stay unchanged. New files are private
 loaded as a character. Once all writers are stopped, these orphan temporary files
 may be removed. Keep the `.sav` and normal backup copies.
 
-Saves for each character run in order. The central server also retains its
-existing playtime regression check. A logout success is sent only after file
-persistence and, centrally, hiscore/session updates finish. Validation, disk and
-DB failures report failure; the world retains the in-memory snapshot and retries
-every 15 seconds. Reconnects cannot discard pending snapshots after the hop timer.
-A successful save followed by a DB failure is safe to retry. File and DB updates
-are not a single cross-resource transaction.
+Saves for each character run in order. Each snapshot carries a unique operation
+ID, a monotonically increasing sequence within its world process, and a session
+ID; retries retain the original identity. World only removes a pending logout
+when the acknowledgement names that exact operation. A duplicate acknowledgement
+from an earlier logout cannot clear a newer snapshot or permit early shutdown.
+
+The standalone worker and central server suppress successful duplicate writes
+and reject older sequences. The central server also retains its existing playtime
+regression check. Authentication and persistence share the character lock; once
+a new login/reconnect is accepted, writes and force-logout requests from the old
+session are rejected. Headless bot persistence is bound to the announced world
+incarnation and its own player instance. Re-announcing the same incarnation after
+a network reconnect does not reset login state; an older incarnation cannot
+replace a newer one (incarnation startup times must increase for each node ID).
+These fences and operation metadata are internal protocol state, not save bytes
+or new database columns. Stop/upgrade/restart world and login components together;
+older components lacking operation metadata cannot acknowledge these saves.
+
+A logout success is sent only after file persistence and, centrally,
+hiscore/session updates finish. Validation, disk and DB failures report failure;
+the world retains the in-memory snapshot and retries every 15 seconds. Reconnects
+cannot discard pending snapshots after the hop timer. A successful file save
+followed by a DB failure retries the same operation until its bookkeeping finishes.
+A completed operation is acknowledged again without repeating writes or releasing
+a newly authenticated session. File and DB updates are not a single
+cross-resource transaction. After a login-server process restart, an unknown
+human persistence session fails closed; preserve the running world's RAM and
+resolve session ownership before forcing any process exit.
 
 SIGINT, SIGTERM and SIGHUP already enter the world's graceful shutdown path.
 `::reboot` and expiration of `::slowreboot` use that same drain. It waits until
@@ -193,7 +214,9 @@ node --import tsx --test tests/player-save.test.ts tests/persistence-runtime.tes
 Tests use temporary save directories and a fresh SQLite DB from the existing
 migrations, never an operator's characters. They cover interrupted/failed writes,
 CRC rejection, per-character ordering, central logout failure and DB completion,
-retention of failed snapshots after reconnect, and cancellation permissions.
+retention of failed snapshots after reconnect, operation correlation, duplicate/late
+acknowledgements, reordered retries with equal playtime, authentication/save
+serialization, old-session/incarnation rejection, and cancellation permissions.
 The restart fixture boots the real world/map, admits a network-player character
 using an in-memory transport and the configured BotManager population, advances
 XP/inventory/bank/permanent variables/playtime, sends SIGTERM, and waits for actual

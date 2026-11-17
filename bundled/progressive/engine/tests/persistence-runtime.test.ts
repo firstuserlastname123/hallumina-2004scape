@@ -56,3 +56,7 @@ test('human and configured bots retain progression after complete world shutdown
     assert.match(output, /Server shutdown complete/);
     assert.match(run(options, 'persistence-restart.ts', 'restore'), /persistence restart checks passed/);
 });
+
+test('logout identities fence delayed acknowledgements, local retries and shutdown completion', t => {
+    assert.match(run(fixture(t), 'persistence-acknowledgements.ts'), /persistence acknowledgement checks passed/);
+});

@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { withPlayerSaveLock, writePlayerSave } from '#/server/login/PlayerSave.js';
+import { withPlayerSaveLock, writePlayerSave, checkSaveOperation, type SaveOperationState } from '#/server/login/PlayerSave.js';
 import { parentPort } from 'worker_threads';
 
 import { LoginClient } from '#/server/login/LoginClient.js';
@@ -9,6 +9,8 @@ import { type GenericLoginThreadResponse } from './index.d.js';
 import { trackLoginAttempts, trackLoginTime } from './LoginMetrics.js';
 
 const client = new LoginClient(Environment.NODE_ID);
+const localSaves = new Map<string, SaveOperationState>();
+const localSessions = new Map<string, string>();
 
 if (!parentPort) throw new Error('This file must be run as a worker thread.');
 
@@ -23,7 +25,7 @@ parentPort.on('message', async msg => {
     } catch (err) {
         console.error(err);
         if (msg.type === 'player_logout') {
-            parentPort!.postMessage({ type: 'player_logout', username: msg.username, success: false });
+            parentPort!.postMessage({ type: 'player_logout', username: msg.username, saveId: msg.saveId, success: false });
         }
     }
 });
@@ -68,6 +70,7 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
                 });
                 stopTimer();
             } else {
+                localSessions.set(username, socket);
                 let staffmodlevel = 0;
 
                 if (!Environment.NODE_PRODUCTION) {
@@ -110,14 +113,15 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
             break;
         }
         case 'player_logout': {
-            const { username, save } = msg;
+            const { username, save, saveId, sessionId } = msg;
 
             if (Environment.LOGIN_SERVER) {
-                const success = await client.playerLogout(username, save);
+                const success = await client.playerLogout(username, save, msg);
 
                 parentPort.postMessage({
                     type: 'player_logout',
                     username,
+                    saveId,
                     success
                 });
             } else {
@@ -126,35 +130,48 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
                     fs.mkdirSync(`data/players/${profile}`, { recursive: true });
                 }
 
-                await writePlayerSave(`data/players/${profile}/${username}.sav`, save);
+                if (!checkSaveOperation(msg, localSaves.get(username))) {
+                    if (localSessions.has(username) && localSessions.get(username) !== sessionId) throw new Error('Stale save session');
+                    const operation = { saveId, saveSequence: msg.saveSequence, sessionId, completed: false };
+                    localSaves.set(username, operation);
+                    await writePlayerSave(`data/players/${profile}/${username}.sav`, save);
+                    operation.completed = true;
+                }
 
                 parentPort.postMessage({
                     type: 'player_logout',
                     username,
+                    saveId,
                     success: true
                 });
             }
             break;
         }
         case 'player_autosave': {
-            const { username, save } = msg;
+            const { username, save, saveId, sessionId } = msg;
 
             if (Environment.LOGIN_SERVER) {
-                await client.playerAutosave(username, save);
+                await client.playerAutosave(username, save, msg);
             } else {
                 const profile = Environment.NODE_PROFILE;
                 if (!fs.existsSync(`data/players/${profile}`)) {
                     fs.mkdirSync(`data/players/${profile}`, { recursive: true });
                 }
 
-                await writePlayerSave(`data/players/${profile}/${username}.sav`, save);
+                if (!checkSaveOperation(msg, localSaves.get(username))) {
+                    if (localSessions.has(username) && localSessions.get(username) !== sessionId) throw new Error('Stale save session');
+                    const operation = { saveId, saveSequence: msg.saveSequence, sessionId, completed: false };
+                    localSaves.set(username, operation);
+                    await writePlayerSave(`data/players/${profile}/${username}.sav`, save);
+                    operation.completed = true;
+                }
             }
             break;
         }
         case 'player_force_logout': {
             if (Environment.LOGIN_SERVER) {
                 const { username } = msg;
-                await client.playerForceLogout(username);
+                await client.playerForceLogout(username, msg.sessionId);
             }
             break;
         }

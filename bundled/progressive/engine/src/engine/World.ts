@@ -1,5 +1,6 @@
 // stdlib
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { Worker } from 'worker_threads';
 
 const tsxWorkerHook = new URL('./worker-bootstrap.mjs', import.meta.url).href;
@@ -108,12 +109,17 @@ import { BotManager } from '#/engine/bot/BotManager.js';
 const priv = forge.pki.privateKeyFromPem(fs.readFileSync('data/config/private.pem', 'ascii'));
 
 type LogoutRequest = {
+    saveId: string;
+    saveSequence: number;
+    sessionId: string;
     save: Uint8Array;
     lastAttempt: number;
     createdAt: number;
 };
 
 class World {
+    private saveSequence = 0;
+    private readonly headlessSaveSessions = new WeakMap<Player, string>();
     private loginThread = new Worker('./src/server/login/LoginThread.ts', { execArgv: ['--import', tsxWorkerHook] });
     private friendThread = new Worker('./src/server/friend/FriendThread.ts', { execArgv: ['--import', tsxWorkerHook] });
     private loggerThread = new Worker('./src/server/logger/LoggerThread.ts', { execArgv: ['--import', tsxWorkerHook] });
@@ -831,7 +837,10 @@ class World {
                 this.loginThread.postMessage({
                     type: 'player_logout',
                     username,
-                    save: request.save
+                    save: request.save,
+                    saveId: request.saveId,
+                    saveSequence: request.saveSequence,
+                    sessionId: request.sessionId
                 });
             }
         }
@@ -1258,7 +1267,10 @@ class World {
             this.loginThread.postMessage({
                 type: 'player_autosave',
                 username: player.username,
-                save: player.save()
+                save: player.save(),
+                saveId: randomUUID(),
+                saveSequence: ++this.saveSequence,
+                sessionId: this.saveSession(player)
             });
         }
     }
@@ -1659,6 +1671,7 @@ class World {
     forceLogout(player: Player, response = -1) {
         this.loginThread.postMessage({
             type: 'player_force_logout',
+            sessionId: player.session,
             username: player.username
         });
 
@@ -1969,6 +1982,7 @@ class World {
                         client.close();
                         this.loginThread.postMessage({
                             type: 'player_force_logout',
+                            sessionId: client.uuid,
                             username: username
                         });
                         return;
@@ -1990,12 +2004,13 @@ class World {
                 // todo: maybe we can tell the login thread to swap for the last-good save?
                 this.loginThread.postMessage({
                     type: 'player_force_logout',
+                    sessionId: client.uuid,
                     username: username
                 });
             }
         } else if (isPlayerLogoutResponse(msg)) {
-            const { username, success } = msg;
-            if (!this.logoutRequests.has(username)) {
+            const { username, success, saveId } = msg;
+            if (!saveId || this.logoutRequests.get(username)?.saveId !== saveId) {
                 return;
             }
 
@@ -2391,10 +2406,23 @@ class World {
         });
     }
 
+    private saveSession(player: Player): string {
+        if (player.session !== 'headless') return player.session;
+        let session = this.headlessSaveSessions.get(player);
+        if (!session) {
+            session = randomUUID();
+            this.headlessSaveSessions.set(player, session);
+        }
+        return session;
+    }
+
     flushPlayer(player: Player) {
         const save = player.save();
 
         this.logoutRequests.set(player.username, {
+            saveId: randomUUID(),
+            saveSequence: ++this.saveSequence,
+            sessionId: this.saveSession(player),
             save,
             lastAttempt: -1,
             createdAt: Date.now()

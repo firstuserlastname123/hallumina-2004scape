@@ -54,3 +54,26 @@ export async function writePlayerSave(filename: string, raw: Uint8Array): Promis
         await fs.rm(temporary, { force: true });
     }
 }
+
+export type SaveOperation = {
+    saveId: string;
+    saveSequence: number;
+    sessionId: string;
+};
+
+export type SaveOperationState = SaveOperation & { completed: boolean };
+
+// Called inside the character lock. Sequences order snapshots within one world
+// incarnation; the operation ID remains unchanged across all retries.
+export function checkSaveOperation(operation: SaveOperation, previous?: SaveOperationState): boolean {
+    if (typeof operation.saveId !== 'string' || !operation.saveId ||
+        typeof operation.sessionId !== 'string' || !operation.sessionId ||
+        !Number.isSafeInteger(operation.saveSequence) || operation.saveSequence < 1) {
+        throw new Error('Missing save operation identity');
+    }
+    if (!previous || operation.saveSequence > previous.saveSequence) return false;
+    if (operation.saveSequence === previous.saveSequence && operation.saveId === previous.saveId && operation.sessionId === previous.sessionId) {
+        return previous.completed;
+    }
+    throw new Error('Stale save operation');
+}
