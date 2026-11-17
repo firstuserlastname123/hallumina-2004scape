@@ -14,6 +14,18 @@ The original 9,000-line attachment was unavailable in this workspace. The suppli
 
 The revision, checksum baselines, reward formulas, initial equipment, personalities, save format and SQLite schema are unchanged. `Player.addXp` only gains an observational callback for population statistics. Preset PK profiles and loaded XP are excluded from progression measurements.
 
+## Review corrections: destination jitter and subtask ownership
+
+The follow-up keeps the stationary-activity fix, collision checks, logging controls and existing game mechanics. Production corrections are limited to `BotAction.ts`, `BotRouteRetry.ts` and `BotPlayer.ts`.
+
+- Nearby requests within four tiles of a **stable** route anchor reuse an active route. The latest requested tile is considered when that route ends. Accumulated target movement beyond that radius or a floor change still retargets, and pending gate operations remain intact.
+- Both small jitter and large retargets preserve the current task's failure count and backoff. Progress is evaluated against the previous anchor before accepting a new one. A target moving closer to a stationary bot, or a request for the bot's current tile, cannot replenish retries. Actual travel toward the goal or actual arrival can replenish them; a short local arrival is credited once, rather than on every stationary tick. Successful task changes still start a new task-owned budget.
+- Parent tasks and subtasks have separate navigation state. Failure messages identify the active task. Calls made while a child is ticking remain attributed to that child, including its abort/exception path. An aborted child cannot queue a new route through its interrupted callback.
+- A failed/interrupted child releases its queued action, route and task-owned claims. The child receives a 200-tick retry cooldown; the parent retains its own retry budget and resumes. Child completion resumes the parent normally, and interrupted parents release the child before goal selection.
+- `setSubTask` now returns whether scheduling succeeded. It refuses duplicate/replacement requests while a child is active, during that child's cooldown, while the parent is interrupted, or until the parent/planner has had a turn after a child exits. Renaming a child therefore cannot bypass the parent turn. A child is limited to 300 active task-tick calls; ordinary engine dialog/teleport processing retains its existing priority.
+
+Targeted native-engine checks cover the actual `BankstandTask.handleWalk` call site, preservation of queued waypoint arrays, large destination changes, a moving destination, gate preservation, dynamic collision removal, exhausted randomized child routes, repeated child scheduling, cooldown expiry, interrupted/exceptional children, parent resumption, and resumption of the planner when no parent exists.
+
 ## Console configuration
 
 Console logging is independent of the web bot debugger. Add settings to `engine/.env` and restart:
@@ -65,7 +77,53 @@ The harness refuses an existing simulation save profile, a database with human a
 
 The JSON report records full-population samples every 1,000 ticks, timing distributions, action XP/levels, observed tasks, and each bot's ending stats. XP is counted at actual `addXp` calls after the first 20 initialization ticks, so PK profile assignments cannot appear as earned XP. Navigation recovery counts are observed before log filtering. Timeout diagnostics are observed before both the old wall-clock log throttle and the new severity/rate filter; emitted timeout lines are reported separately. Resource failures use raw event counts in the new version. At completion, the normal engine logout queue flushes all 100 saves; the harness checks save CRCs, reloads stats/coordinates/permanent inventories, and runs SQLite `quick_check`.
 
-## Simulation results
+## Revised comparison after review
+
+The revised experiment reruns **all three implementations** with the same harness: the original `dev` baseline (`1df5775`), the previous PR implementation (`cb4f778`), and these corrections. Each implementation runs seeds 254 and 255 for 6,000 full world ticks with 100 bots, fresh SQLite databases, and fresh save profiles. All six runs are sequential. The three corrected production files are fingerprinted in each report, so the measured working tree can be matched to the submitted changes.
+
+The harness additionally counts queued routes, clears of active routes, raw path/progress failures, main/child deferrals and accepted subtask scheduling. Queued routes include the engine's interaction paths; they are not a count of all failed BFS attempts. Original-baseline deferral/path-budget metrics are unavailable because those mechanisms did not exist. Emitted lines and raw failures remain separate metrics.
+
+[Machine-readable revised results](playerbot-review-simulation-results.json) include all raw counters, source fingerprints, cohorts and 1,000-tick samples. Each corrected source fingerprint matches the submitted production files.
+
+All six reported runs retained 100 active bots and passed all 600 save CRC/stat/coordinate/permanent-inventory round trips. SQLite retained 100 accounts per database and returned `ok` in every integrity check. All 52 progression bots earned XP in every run.
+
+| Metric | 254 original | 254 previous PR | 254 corrected | 255 original | 255 previous PR | 255 corrected |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Oscillation recoveries | 63,877 | 226 | 100 | 65,813 | 154 | 104 |
+| Stationary-only oscillations | 53,790 | 0 | 0 | 56,067 | 0 | 0 |
+| Walking-stuck recoveries | 0 | 509 | 614 | 0 | 561 | 635 |
+| Raw path failures | n/a | 607 | 427 | n/a | 726 | 439 |
+| No-progress failures | n/a | 14 | 24 | n/a | 12 | 18 |
+| Main task deferrals | n/a | 116 | 182 | n/a | 147 | 185 |
+| Raw timeout diagnostics | 2,086 | 1,460 | 1,151 | 2,037 | 1,302 | 1,174 |
+| Raw failed sheep searches | 1,486 | 150 | 136 | 262 | 24 | 113 |
+| Queued routes, engine + bot | 29,528 | 44,204 | 42,353 | 28,782 | 42,161 | 39,270 |
+| Clears of active routes | 7,417 | 23,684 | 18,734 | 7,421 | 21,995 | 17,028 |
+| Emitted console lines | 160,708 | 1,298 | 1,404 | 160,199 | 1,235 | 1,348 |
+| Console bytes | 15,573,125 | 173,287 | 191,110 | 16,238,789 | 167,699 | 185,437 |
+| Progression-bot earned XP | 84,186.5 | 75,239.8 | 82,364.0 | 79,191.8 | 76,979.1 | 75,138.0 |
+| All-bot action XP | 272,012.4 | 271,260.9 | 299,178.5 | 244,866.0 | 244,670.4 | 216,149.1 |
+| Level gains | 599 | 569 | 600 | 589 | 577 | 565 |
+
+| Processing time | 254 original | 254 previous PR | 254 corrected | 255 original | 255 previous PR | 255 corrected |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Steady world mean / p95 / max (ms) | 17.75 / 27.10 / 331.08 | 19.97 / 31.24 / 288.57 | 19.20 / 27.82 / 429.33 | 17.80 / 26.36 / 384.26 | 19.32 / 28.20 / 326.23 | 19.81 / 28.72 / 361.68 |
+| Steady bot mean / p95 (ms) | 5.65 / 11.90 | 7.61 / 15.03 | 7.32 / 14.03 | 5.53 / 11.18 | 7.04 / 13.53 | 7.21 / 13.73 |
+| World startup-inclusive max (ms) | 3988.59 | 4077.81 | 3933.24 | 3968.83 | 4306.27 | 3884.35 |
+| World ticks over 600ms, startup / steady | 1 / 0 | 1 / 0 | 1 / 0 | 1 / 0 | 1 / 0 | 1 / 0 |
+| Wall seconds, including save checks | 117.94 | 131.38 | 126.51 | 118.21 | 127.52 | 130.06 |
+
+Across seeds, corrected raw path failures were 866 versus 1,333 in the previous PR (-35.0%). Active-route clears were 35,762 versus 45,679 (-21.7%). Deferrals rose from 263 to 367: failure budgets now exhaust instead of being replenished by changed coordinates. These counts include native interaction routes and differing task mixes.
+
+Combined progression-bot XP was 157,502.0: +3.5% versus the previous PR and -3.6% versus the original baseline. Individual seed results differ, and total action XP includes PK combat. No XP reward, multiplier or personality weight changed. This is not evidence of a universal throughput improvement.
+
+Limitations: corrected raw walking-stuck counts, sheep-search failures and console volume can be higher than the previous PR; the tables retain those results. More bounded deferrals and task-owner labels increase warning volume. Mean processing cost remains above the original baseline and varies against the previous PR by seed. No steady tick exceeded 600ms; startup-inclusive outliers remain reported. These are accelerated managed-host simulations, not paced Ubuntu VirtualBox measurements.
+
+All six population runs scheduled **zero subtasks**. They measure normal-population navigation/task behavior, not subtask recovery throughput. Subtask failure attribution, bounded priority, cleanup and successful parent/planner resumption are validated by the dedicated real-engine fixture, including an actually enclosed destination. The three focused retry regressions also fail against `cb4f778` and pass against the corrected implementation.
+
+The initial four-run report below is retained as historical evidence. It must not be combined with the revised experiment as if all runs were the same paired workload. Existing wall-clock timers and shared random-number consumption produce different trajectories even with the same initial seed. Accelerated world ticks do not validate real-time VM scheduling, browser/network load, or a multi-day soak.
+
+## Initial PR simulation results (historical)
 
 Final sequential run results are recorded in `playerbot-simulation-results.json` alongside this document. These are managed Linux/Node 24.22.1 measurements, not measurements from the user's Ubuntu 26.04 VirtualBox guest. All configured personality groups participate: 52 progressing bots and 48 specialized PKer, vendor and social bots.
 
@@ -110,6 +168,6 @@ npm run test:bot
 npm run test:integrity
 ```
 
-The bot suite covers stationary activities, real period-2/3 cycles, pauses/floor changes, subtask early returns, stuck recovery, destination retry budgets, long detours, cache bounds, log filtering/rate limits, timing metrics, native rsmod turn order, CSV blockers between turns, enclosed sources, inactive NPCs, sheep rotation/depletion/regrowth/partial batches, planner cooldowns, personality weights and combat approach expiry. The bot suite passes 13 tests, including the real-map fixture; the integrity suite passes five tests including its parent case. Runtime tests isolate SQLite in a temporary directory. The integrity suite compiles r254 with all three verification switches enabled and deliberately changes `.npc`, `.obj` and `.if` content to confirm checksum rejection.
+The bot suite covers stationary activities, real period-2/3 cycles, pauses/floor changes, subtask early returns, stuck recovery, destination retry budgets, long detours, cache bounds, log filtering/rate limits, timing metrics, native rsmod turn order, CSV blockers between turns, enclosed sources, inactive NPCs, sheep rotation/depletion/regrowth/partial batches, planner cooldowns, personality weights and combat approach expiry. The bot suite passes 19 tests, including both real-map fixtures; the integrity suite passes five tests including its parent case. Runtime tests isolate SQLite in a temporary directory. The integrity suite compiles r254 with all three verification switches enabled and deliberately changes `.npc`, `.obj` and `.if` content to confirm checksum rejection.
 
 The assembled baseline and updated engines also receive `tsc --noEmit`. Both retain the same pre-existing errors in the applet/camera/mouse event message types and ReportAbuse imports/enum; there are no new errors in the changed production code. These unrelated protocol typing errors are outside this PR.

@@ -1880,7 +1880,10 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
 export function walkTo(player: Player, destX: number, destZ: number, level = 0): void {
     const bot = (player as any)._bot;
     if (bot) {
+        if (bot.activeTask?.interrupted) return;
         const changed = bot.navigation.request(player.x, player.z, player.level, destX, destZ, level, bot.ticksAliveValue);
+        // Nearby randomized requests share the active route. Larger changes still
+        // retarget promptly, without replenishing the task's failure budget.
         if (changed && !_hasGateInteractionPending(player)) {
             player.clearWaypoints();
             player.clearPendingAction();

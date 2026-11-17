@@ -42,7 +42,8 @@ const logModule = fs.existsSync('src/engine/bot/BotLog.ts') ? await import('#/en
 const { default: Packet } = await import('#/io/Packet.js');
 if (Environment.ENGINE_REVISION !== 254) throw new Error('This simulation requires revision 254.');
 
-const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0 };
+const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0,
+    routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
 let insideTaskLog = 0;
 // Observe timeout diagnostics before either the legacy wall-clock throttle or the
 // new logger can filter them. Emitted timeout lines are a separate volume metric.
@@ -66,6 +67,11 @@ if (logModule) {
 }
 const originalLog = BotPlayer.prototype.log;
 BotPlayer.prototype.log = function (message: string, ...args: any[]) {
+    const key = args[1];
+    if (key === 'path_failed') counters.pathFailures++;
+    if (key === 'no_progress') counters.noProgress++;
+    if (key === 'task_deferred') counters.taskDeferrals++;
+    if (key === 'subtask_deferred') counters.subtaskDeferrals++;
     if (message.includes('[Navigation] oscillating')) {
         counters.oscillation++;
         const h = (this.movementMonitor as any).posHistory as number[];
@@ -73,6 +79,13 @@ BotPlayer.prototype.log = function (message: string, ...args: any[]) {
     }
     if (message.includes('[Navigation] stuck')) counters.stuck++;
     return originalLog.apply(this, [message, ...args] as Parameters<typeof originalLog>);
+};
+const originalSubtask = BotPlayer.prototype.setSubTask;
+BotPlayer.prototype.setSubTask = function (task) {
+    const before = (this as any).subTask;
+    const result = originalSubtask.call(this, task);
+    if ((this as any).subTask && (this as any).subTask !== before) counters.subtasksScheduled++;
+    return result;
 };
 for (const method of ['log', 'warn', 'error'] as const) {
     const original = console[method].bind(console);
@@ -108,8 +121,14 @@ Player.prototype.queueWaypoint = function (x, z) {
 };
 const originalWaypoints = Player.prototype.queueWaypoints;
 Player.prototype.queueWaypoints = function (points) {
+    if (this.is_bot && points.length > 0) counters.routesQueued++;
     if (this.is_bot && points.length > 0 && Array.from(points).every(coord => ((coord >> 14) & 0x3fff) === this.x && (coord & 0x3fff) === this.z)) counters.noOpPathsQueued++;
     originalWaypoints.call(this, points);
+};
+const originalClear = Player.prototype.clearWaypoints;
+Player.prototype.clearWaypoints = function () {
+    if (this.is_bot && this.hasWaypoints()) counters.activeRoutesCleared++;
+    originalClear.call(this);
 };
 const worldTimes: number[] = [];
 const botTimes: number[] = [];
@@ -202,6 +221,8 @@ for (const bot of population()) {
     verifiedSaves++;
 }
 const report = { seed, ticks, simulatedMinutes: ticks * 0.6 / 60, intervalMs: interval, wallSeconds: (performance.now() - wallStart) / 1000,
+    version: process.env.BOT_SIM_LABEL ?? 'unspecified', sourceSha256: process.env.BOT_SIM_SOURCE_SHA256 ?? null,
+    featureSupport: { navigationRetry: typeof BotPlayer.prototype.navigationFailed === 'function', taskDeferral: typeof BotPlayer.prototype.deferCurrentTask === 'function' },
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },

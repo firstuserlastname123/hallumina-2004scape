@@ -69,7 +69,8 @@ test('failed routes back off, exhaust a budget and reset on observed progress', 
     assert.equal(route.canAttempt(29), true);
     route.fail(29);
     assert.equal(route.request(5, 1, 0, 20, 1, 1), true);
-    assert.equal(route.failures, 0);
+    assert.equal(route.failures, 1); // floor changes retarget, but do not forgive failures
+    assert.equal(route.canAttempt(30), false);
 });
 
 test('logging filters detail, retains failure counts, rate limits each bot and reports repeats', () => {
@@ -147,4 +148,71 @@ test('tick metrics retain percentiles, true maximum and 600ms overruns with boun
     assert.equal((metrics as any).samples.length, 600);
     metrics.reset();
     assert.equal(metrics.snapshot().count, 0);
+});
+
+test('randomized nearby destinations retain the retry budget and exponential backoff', () => {
+    const route = new BotRouteRetry();
+    route.request(0, 0, 0, 50, 50, 0, 0);
+    const attempts: number[] = [];
+    for (let tick = 0; tick <= 28; tick++) {
+        assert.equal(route.request(0, 0, 0, 50 + tick % 3 - 1, 50 + (tick * 2) % 3 - 1, 0, tick), false);
+        if (route.canAttempt(tick)) {
+            attempts.push(tick);
+            assert.equal(route.fail(tick), attempts.length === 4);
+        }
+    }
+    assert.deepEqual(attempts, [0, 4, 12, 28]);
+    assert.equal(route.failures, 4);
+});
+
+test('large randomized retargets, selecting the current tile and floor changes cannot replenish retries', () => {
+    const route = new BotRouteRetry();
+    route.request(10, 10, 0, 50, 50, 0, 0);
+    route.fail(0);
+    for (let tick = 1; tick <= 100; tick++) {
+        const target = tick % 2 ? 10 : 100 + tick;
+        route.request(10, 10, 0, target, target, tick % 3, tick);
+        assert.equal(route.failures, 1);
+    }
+    assert.equal(route.isStalled(100), true);
+});
+
+test('jitter is compared to a stable anchor so cumulative target motion still retargets', () => {
+    const route = new BotRouteRetry();
+    route.request(0, 0, 0, 50, 50, 0);
+    for (let dx = 1; dx <= 4; dx++) assert.equal(route.request(0, 0, 0, 50 + dx, 50, 0), false);
+    assert.equal(route.request(0, 0, 0, 55, 50, 0), true);
+    assert.equal(route.request(0, 0, 0, 55, 50, 1), true);
+});
+
+test('actual travel and arrival restore retries while a target approaching a stationary bot does not', () => {
+    const route = new BotRouteRetry();
+    route.request(0, 0, 0, 20, 0, 0);
+    route.fail(0);
+    route.request(0, 0, 0, 10, 0, 0, 1);
+    assert.equal(route.failures, 1);
+    assert.equal(route.canAttempt(1), false);
+    route.observe(3, 0, 0, true, 4);
+    assert.equal(route.failures, 0);
+    assert.equal(route.canAttempt(4), true);
+    route.fail(4);
+    route.request(3, 0, 0, 5, 0, 0, 5);
+    assert.equal(route.failures, 1);
+    route.observe(5, 0, 0, true, 6); // arrival after a short legitimate retarget
+    assert.equal(route.failures, 0);
+});
+
+test('a short successful local trip credits arrival once without allowing stationary budget resets', () => {
+    const route = new BotRouteRetry();
+    route.request(0, 0, 0, 20, 0, 0, 0);
+    route.observe(20, 0, 0, true, 1);
+    route.fail(1);
+    assert.equal(route.request(20, 0, 0, 21, 0, 0, 2), false);
+    assert.equal(route.failures, 1);
+    route.observe(21, 0, 0, true, 3);
+    assert.equal(route.failures, 0);
+    route.fail(3);
+    route.observe(21, 0, 0, true, 4);
+    route.request(21, 0, 0, 21, 0, 0, 4);
+    assert.equal(route.failures, 1);
 });
