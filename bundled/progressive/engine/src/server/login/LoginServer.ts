@@ -1,6 +1,8 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 
+import { withPlayerSaveLock, writePlayerSave } from '#/server/login/PlayerSave.js';
+
 import { compare, hashSync } from 'bcrypt-ts';
 import { WebSocket, WebSocketServer } from 'ws';
 
@@ -441,63 +443,47 @@ export default class LoginServer {
                         } finally {
                             this.loginRequests.delete(safeName);
                         }
-                    } else if (type === 'player_logout') {
+                    } else if (type === 'player_logout' || type === 'player_autosave') {
                         const { replyTo, username, save } = msg;
+                        const filename = `data/players/${profile}/${username}.sav`;
+                        try {
+                            await withPlayerSaveLock(filename, async () => {
+                                const raw = Buffer.from(save, 'base64');
+                                if (!PlayerLoading.verify(new Packet(raw)) || await this.wouldResetSaveFile(raw, profile, username)) {
+                                    throw new Error(`${username}: Invalid or regressing save file`);
+                                }
+                                await writePlayerSave(filename, raw);
+                                if (type === 'player_autosave') return;
 
-                        const raw = Buffer.from(save, 'base64');
-                        if (PlayerLoading.verify(new Packet(raw)) && !(await this.wouldResetSaveFile(raw, profile, username))) {
-                            if (!fs.existsSync(`data/players/${profile}`)) {
-                                await fsp.mkdir(`data/players/${profile}`, { recursive: true });
-                            }
+                                const account = await db.selectFrom('account')
+                                    .leftJoin('account_login', join => join
+                                        .onRef('account_id', '=', 'id')
+                                        .on('profile', '=', profile)
+                                    )
+                                    .where('username', '=', username)
+                                    .selectAll()
+                                    .executeTakeFirst();
 
-                            await fsp.writeFile(`data/players/${profile}/${username}.sav`, raw);
-                        } else {
-                            console.error(username, 'Invalid save file');
-                        }
+                                await updateHiscores(account, PlayerLoading.load(username, new Packet(raw), null), profile);
 
-                        const account = await db.selectFrom('account')
-                            .leftJoin('account_login', join => join
-                                .onRef('account_id', '=', 'id')
-                                .on('profile', '=', profile)
-                            )
-                            .where('username', '=', username)
-                            .selectAll()
-                            .executeTakeFirst();
-                        
-                        if (account?.account_id) {
-                            await db
-                                .updateTable('account_login')
-                                .set({
-                                    logged_in: 0,
-                                    login_time: null,
-                                    logged_out: nodeId,
-                                    logout_time: toDbDate(new Date())
-                                })
-                                .where('account_id', '=', account.id)
-                                .where('profile', '=', profile)
-                                .executeTakeFirst();
-                        }
-
-                        s.send(
-                            JSON.stringify({
-                                replyTo,
-                                response: 0
-                            })
-                        );
-
-                        await updateHiscores(account, PlayerLoading.load(username, new Packet(raw), null), profile);
-                    } else if (type === 'player_autosave') {
-                        const { username, save } = msg;
-
-                        const raw = Buffer.from(save, 'base64');
-                        if (PlayerLoading.verify(new Packet(raw)) && !(await this.wouldResetSaveFile(raw, profile, username))) {
-                            if (!fs.existsSync(`data/players/${profile}`)) {
-                                await fsp.mkdir(`data/players/${profile}`, { recursive: true });
-                            }
-
-                            await fsp.writeFile(`data/players/${profile}/${username}.sav`, raw);
-                        } else {
-                            console.error(username, 'Invalid save file');
+                                if (account?.account_id) {
+                                    await db
+                                        .updateTable('account_login')
+                                        .set({
+                                            logged_in: 0,
+                                            login_time: null,
+                                            logged_out: nodeId,
+                                            logout_time: toDbDate(new Date())
+                                        })
+                                        .where('account_id', '=', account.id)
+                                        .where('profile', '=', profile)
+                                        .executeTakeFirst();
+                                }
+                            });
+                            if (type === 'player_logout') s.send(JSON.stringify({ replyTo, response: 0 }));
+                        } catch (err) {
+                            console.error(err);
+                            if (type === 'player_logout') s.send(JSON.stringify({ replyTo, response: 1 }));
                         }
                     } else if (type === 'player_force_logout') {
                         const { username } = msg;

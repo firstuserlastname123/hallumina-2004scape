@@ -844,24 +844,12 @@ class World {
         player: for (const player of this.newPlayers) {
             // prevent logging in if a player save is being flushed
             if (this.logoutRequests.has(player.username)) {
-                const request = this.logoutRequests.get(player.username)!;
-                if (request.createdAt < Date.now() - Environment.NODE_HOP_TIME) {
-                    this.logoutRequests.delete(player.username);
-                } else {
-                    player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - old session is mid-logout');
-
-                    if (isClientConnected(player)) {
-                        player.client.send(Uint8Array.from([5]));
-                        player.client.close();
-                    }
-
-                    this.loginThread.postMessage({
-                        type: 'player_force_logout',
-                        username: player.username
-                    });
-
-                    continue;
+                player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - old session is mid-logout');
+                if (isClientConnected(player)) {
+                    player.client.send(Uint8Array.from([5]));
+                    player.client.close();
                 }
+                continue;
             }
 
             // reconnect a new socket with player in the world
@@ -1847,6 +1835,14 @@ class World {
         }
     }
 
+    cancelReboot(): boolean {
+        // Once draining begins, players may already have been removed/saved.
+        if (this.shutdownTick === -1 || this.shutdown) return false;
+        this.shutdownTick = -1;
+        for (const player of this.playerLoop.all()) player.write(new UpdateRebootTimer(0));
+        return true;
+    }
+
     get isPendingShutdown(): boolean {
         return this.shutdownTicksRemaining > -1;
     }
@@ -1933,12 +1929,7 @@ class World {
             }
 
             const { username, lowMemory, reconnecting, staffmodlevel, muted_until, members, messageCount } = msg;
-            const pendingLogout = this.logoutRequests.get(username);
-            const pendingLogoutExpired = pendingLogout && pendingLogout.createdAt < Date.now() - Environment.NODE_HOP_TIME;
-            const save = pendingLogoutExpired ? pendingLogout.save : msg.save ?? new Uint8Array();
-            if (pendingLogoutExpired) {
-                this.logoutRequests.delete(username);
-            }
+            const save = msg.save ?? new Uint8Array();
 
             // if (reconnecting && !this.getPlayerByUsername(username)) {
             //     // rejected
@@ -1965,13 +1956,9 @@ class World {
                 player.messageCount = messageCount ?? 0;
 
                 if (this.logoutRequests.has(username)) {
-                    // already logged in (on another world)
+                    // Retain unacknowledged snapshots even after the hop timer.
                     client.send(Uint8Array.from([5]));
                     client.close();
-                    this.loginThread.postMessage({
-                        type: 'player_force_logout',
-                        username: username
-                    });
                     return;
                 }
 

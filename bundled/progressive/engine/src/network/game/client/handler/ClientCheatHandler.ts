@@ -591,6 +591,8 @@ export default class ClientCheatHandler extends ClientGameMessageHandler<ClientC
                 }
 
                 World.rebootTimer(Math.ceil(tryParseInt(args[0], 30) * 1000 / 600));
+            } else if (cmd === 'cancelreboot' && Environment.NODE_PRODUCTION) {
+                player.messageGame(World.cancelReboot() ? 'Scheduled shutdown cancelled.' : 'No cancellable shutdown is scheduled.');
             } else if (cmd === 'serverdrop') {
                 // testing reconnection behavior
                 player.terminate();
