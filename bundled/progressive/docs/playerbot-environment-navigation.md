@@ -1,5 +1,7 @@
 # Phase 1.1: environmental navigation on Progressive r254
 
+**Historical initial PR #4 results.** See [the continuation](playerbot-land-transport.md) for the current land, transport and progress corrections and their new validation.
+
 Base: `dev` at `6f660f8` (PRs #2 and #3 merged). The engine revision, content scripts, collision data, personalities, rewards and persistence protocol are unchanged.
 
 ## Reproduced causes and corrections

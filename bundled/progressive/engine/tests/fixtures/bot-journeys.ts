@@ -112,6 +112,19 @@ check('Dragon Slayer menu variation selects the real Karamja fare option', () =>
     assert.equal(carriedCoins(t.p), 30);
     assert.equal(t.p.vars[VarPlayerType.getId('dragonquest')], 2);
 });
+check('alternate Barnaby and plantation customs dialogues retain native fares and quest state', () => {
+    const t = make(2679, 3274, 60);
+    const dragon = VarPlayerType.getId('dragonquest');
+    const hunt = VarPlayerType.getId('hunt');
+    t.p.vars[dragon] = 2;
+    t.p.vars[hunt] = 2;
+    travel(t, 2772, 3230, 400);
+    assert.equal(carriedCoins(t.p), 30);
+    travel(t, 2679, 3275, 400);
+    assert.equal(carriedCoins(t.p), 0);
+    assert.equal(t.p.vars[dragon], 2);
+    assert.equal(t.p.vars[hunt], 2);
+});
 check('interrupted paid voyage cannot charge a second fare on retry', () => {
     const t = make(3028, 3218, 90);
     t.b.currentTask!.tick = () => walkTo(t.p, 2954, 3147);
@@ -226,6 +239,9 @@ check('completed Fishing Contest uses native stairs and traverses the actual tun
     t.p.vars[VarPlayerType.getId('fishingcompo')] = 5;
     assert.equal(chooseTravel(t.p, 2808, 3440).mode, 'tunnel');
     travel(t, 2808, 3440, 600);
+    assert.equal(t.p.vars[VarPlayerType.getId('fishingcompo')], 5);
+    assert.equal(carriedCoins(t.p), 0);
+    travel(t, 2877, 3482, 600);
     assert.equal(t.p.vars[VarPlayerType.getId('fishingcompo')], 5);
     assert.equal(carriedCoins(t.p), 0);
 });
