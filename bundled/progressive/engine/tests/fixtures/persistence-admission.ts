@@ -105,6 +105,49 @@ assert.equal(World.getPlayerByUsername('admission'), player);
 assert.equal(player.session, reconnect.uuid);
 assert.equal(first.state, -1);
 await autosave(player, 'accepted reconnect did not acquire save ownership');
+// Both authenticate against the same owner before World gets a chance to admit
+// either. World accepts them consecutively; the final socket must still save.
+const beforeQueuedReconnects = player.session;
+const intermediateReconnect = new Client();
+const finalReconnect = new Client();
+await propose(intermediateReconnect, true, false);
+await propose(finalReconnect, true, false);
+assert.equal(World.newPlayers.size, 2);
+assert.equal(player.session, beforeQueuedReconnects);
+if (central) assert.equal(server.saveSessions.get(filename).sessionId, beforeQueuedReconnects);
+const sendAdmission = worker.postMessage.bind(worker);
+let finalAdmission: any;
+const intermediateCommitted = central ? response(msg => msg.data?.sessionId === intermediateReconnect.uuid && msg.data?.response === 0) : undefined;
+worker.postMessage = ((msg: any) => {
+    if (central && msg.type === 'player_admit' && msg.sessionId === finalReconnect.uuid) finalAdmission = msg;
+    else sendAdmission(msg);
+}) as typeof worker.postMessage;
+(World as any).processLogins();
+worker.postMessage = sendAdmission;
+if (central) {
+    await intermediateCommitted;
+    // A still-authenticated candidate cannot replace an owner using a stale
+    // predecessor. Only the actual consecutive handoff is accepted.
+    const wrongPredecessor = response(msg => msg.data?.sessionId === finalReconnect.uuid && msg.data?.response === 1);
+    worker.postMessage({ ...finalAdmission, previousSessionId: beforeQueuedReconnects });
+    await wrongPredecessor;
+    assert.equal(server.saveSessions.get(filename).sessionId, intermediateReconnect.uuid);
+    worker.postMessage(finalAdmission);
+}
+assert.equal(World.getPlayerByUsername('admission'), player);
+assert.equal(player.session, finalReconnect.uuid);
+assert.equal(intermediateReconnect.state, -1);
+assert.equal(reconnect.state, -1);
+await autosave(player, 'consecutive queued reconnects left the final admitted session unable to save');
+if (central) {
+    // A delayed admission retry for the intermediate socket must not undo the
+    // final admission, even though that socket was once legitimately accepted.
+    const staleAdmission = response(msg => msg.data?.sessionId === intermediateReconnect.uuid && msg.data?.response === 1);
+    worker.postMessage({ type: 'player_admit', username: player.username, sessionId: intermediateReconnect.uuid,
+        previousSessionId: beforeQueuedReconnects });
+    await staleAdmission;
+    await autosave(player, 'stale intermediate admission displaced the final reconnect');
+}
 const staleReply = response(msg => msg.type === 'player_logout' && msg.saveId === 'stale-socket');
 worker.postMessage({ type: 'player_logout', username: player.username, sessionId: first.uuid,
     saveSequence: 100000, saveId: 'stale-socket', save: player.save() });

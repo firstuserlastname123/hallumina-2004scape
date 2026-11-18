@@ -12,11 +12,12 @@ const client = new LoginClient(Environment.NODE_ID);
 const localSaves = new Map<string, SaveOperationState>();
 const localSessions = new Map<string, string>();
 const localCandidates = new Map<string, Set<string>>();
-const pendingAdmissions = new Map<string, string>();
+const pendingAdmissions = new Map<string, { sessionId: string; previousSessionId?: string }>();
 
 async function confirmAdmission(username: string, sessionId: string): Promise<void> {
-    if (pendingAdmissions.get(username) !== sessionId) return;
-    if (!(await client.playerAdmit(username, sessionId))) throw new Error('Save session admission failed');
+    const admission = pendingAdmissions.get(username);
+    if (admission?.sessionId !== sessionId) return;
+    if (!(await client.playerAdmit(username, sessionId, admission.previousSessionId))) throw new Error('Save session admission failed');
     pendingAdmissions.delete(username);
 }
 
@@ -123,9 +124,9 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
             break;
         }
         case 'player_admit': {
-            const { username, sessionId } = msg;
+            const { username, sessionId, previousSessionId } = msg;
             if (Environment.LOGIN_SERVER) {
-                pendingAdmissions.set(username, sessionId);
+                pendingAdmissions.set(username, { sessionId, previousSessionId });
                 await confirmAdmission(username, sessionId);
             } else {
                 if (!localCandidates.get(username)?.delete(sessionId)) throw new Error('Unknown login candidate');

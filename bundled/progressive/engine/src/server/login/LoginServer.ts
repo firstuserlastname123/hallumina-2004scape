@@ -506,7 +506,12 @@ export default class LoginServer {
                                 if (owner && owner.worldId === worldId && owner.sessionId === sessionId) return;
                                 const candidates = this.loginCandidates.get(filename);
                                 const candidate = candidates?.get(sessionId);
-                                if (!candidate || candidate.worldId !== worldId || candidate.previousOwner !== owner) throw new Error('Stale login admission');
+                                // Consecutive reconnects can authenticate against one earlier
+                                // owner. World must name the actual current predecessor to
+                                // authorize the later handoff within the same world.
+                                const followsOwner = owner && owner.worldId === worldId && owner.nodeId === nodeId &&
+                                    candidate?.previousOwner?.worldId === worldId && msg.previousSessionId === owner.sessionId;
+                                if (!candidate || candidate.worldId !== worldId || (candidate.previousOwner !== owner && !followsOwner)) throw new Error('Stale login admission');
                                 await db.updateTable('account_login')
                                     .set({ logged_in: nodeId, login_time: toDbDate(new Date()) })
                                     .where('account_id', '=', candidate.accountId).where('profile', '=', profile).executeTakeFirst();

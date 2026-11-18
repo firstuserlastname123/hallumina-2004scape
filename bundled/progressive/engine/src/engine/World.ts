@@ -875,9 +875,10 @@ class World {
                     }
 
                     if (other instanceof NetworkPlayer && player instanceof NetworkPlayer) {
+                        const previousSessionId = other.session;
                         other.client = player.client;
                         other.session = other.client.uuid;
-                        this.admitLogin(other);
+                        this.admitLogin(other, previousSessionId);
                         other.client.send(Uint8Array.from([15]));
                     }
 
@@ -1671,8 +1672,8 @@ class World {
         });
     }
 
-    private admitLogin(player: Player): void {
-        this.loginThread.postMessage({ type: 'player_admit', username: player.username, sessionId: player.session });
+    private admitLogin(player: Player, previousSessionId?: string): void {
+        this.loginThread.postMessage({ type: 'player_admit', username: player.username, sessionId: player.session, previousSessionId });
     }
 
     private releaseLogin(username: string, sessionId: string): void {
