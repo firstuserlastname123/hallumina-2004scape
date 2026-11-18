@@ -75,6 +75,17 @@ export class LoginClient extends InternalClient {
         };
     }
 
+    // Authentication is provisional until World has actually admitted the socket.
+    public async playerAdmit(username: string, sessionId: string): Promise<boolean> {
+        await this.worldStartup();
+        if (!this.ws || !this.wsr || !this.wsr.checkIfWsLive()) return false;
+        const reply = await this.wsr.fetchSync({
+            type: 'player_admit', nodeId: this.nodeId, worldId: this.worldId,
+            profile: Environment.NODE_PROFILE, username, sessionId
+        });
+        return !reply.error && reply.result.response === 0 && reply.result.sessionId === sessionId;
+    }
+
     // returns true if the login server acknowledged the logout
     public async playerLogout(username: string, save: Uint8Array, operation: SaveOperation) {
         await this.worldStartup();
@@ -129,7 +140,7 @@ export class LoginClient extends InternalClient {
     }
 
     // in case the player is stuck logged-in
-    public async playerForceLogout(username: string, sessionId: string) {
+    public async playerForceLogout(username: string, sessionId: string, candidateOnly = false) {
         await this.worldStartup();
 
         if (!this.ws || !this.wsr || !this.wsr.checkIfWsLive()) {
@@ -140,6 +151,7 @@ export class LoginClient extends InternalClient {
             JSON.stringify({
                 type: 'player_force_logout',
                 sessionId,
+                candidateOnly,
                 nodeId: this.nodeId,
                 worldId: this.worldId,
                 nodeTime: Date.now(),

@@ -35,8 +35,10 @@ function rpc(msg: any) {
 }
 ws.send(JSON.stringify({ type: 'world_startup', profile: 'main', nodeId: 10, worldId, worldStartedAt: 1 }));
 async function login(socket: string) {
-    return rpc({ type: 'player_login', username: 'persist', password: 'test', uid: 1, socket,
+    const reply = await rpc({ type: 'player_login', username: 'persist', password: 'test', uid: 1, socket,
         remoteAddress: '127.0.0.1', reconnecting: false, hasSave: false, nodeMembers: false });
+    if ([0, 2, 4].includes(reply.response)) assert.equal((await rpc({ type: 'player_admit', username: 'persist', sessionId: socket })).response, 0);
+    return reply;
 }
 assert.equal((await login(sessionId)).response, 4);
 function send(raw: Uint8Array, type = 'player_logout', operation = { saveId: randomUUID(), saveSequence: ++sequence, sessionId }) {
@@ -168,8 +170,12 @@ function wireRequest(msg: any) {
         wire.postMessage(msg);
     });
 }
-const authenticate = (socket: string, reconnecting = false) => wireRequest({ type: 'player_login', username: 'wiretest', password: 'test', socket,
-    uid: 1, remoteAddress: '127.0.0.1', lowMemory: false, reconnecting, hasSave: reconnecting });
+const authenticate = async (socket: string, reconnecting = false) => {
+    const reply = await wireRequest({ type: 'player_login', username: 'wiretest', password: 'test', socket,
+        uid: 1, remoteAddress: '127.0.0.1', lowMemory: false, reconnecting, hasSave: reconnecting });
+    if ([0, 2, 4].includes(reply.reply)) wire.postMessage({ type: 'player_admit', username: 'wiretest', sessionId: socket });
+    return reply;
+};
 assert.equal((await authenticate('wire-session-one')).reply, 4);
 const wirePlayer = PlayerLoading.load('wiretest', new Packet(new Uint8Array()), null);
 wirePlayer.playtime = 200;

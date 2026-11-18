@@ -60,3 +60,9 @@ test('human and configured bots retain progression after complete world shutdown
 test('logout identities fence delayed acknowledgements, local retries and shutdown completion', t => {
     assert.match(run(fixture(t), 'persistence-acknowledgements.ts'), /persistence acknowledgement checks passed/);
 });
+
+for (const mode of ['local', 'central']) {
+    test(`${mode} login ownership follows World admission and preserves pending logouts`, t => {
+        assert.match(run(fixture(t), 'persistence-admission.ts', mode), /persistence admission .* checks passed/);
+    });
+}

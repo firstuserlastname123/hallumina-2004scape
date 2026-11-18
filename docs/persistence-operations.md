@@ -35,10 +35,16 @@ from an earlier logout cannot clear a newer snapshot or permit early shutdown.
 
 The standalone worker and central server suppress successful duplicate writes
 and reject older sequences. The central server also retains its existing playtime
-regression check. Authentication and persistence share the character lock; once
-a new login/reconnect is accepted, writes and force-logout requests from the old
-session are rejected. Headless bot persistence is bound to the announced world
-incarnation and its own player instance. Re-announcing the same incarnation after
+regression check. Authentication is provisional: it does not change the current
+save owner or reset completed-operation tracking. World explicitly confirms an
+accepted login/reconnect after checking duplicate players and pending logouts;
+only that confirmation transfers save ownership. Rejected or abandoned attempts
+release only their provisional login, preserving the active owner and pending
+snapshots. Authentication, admission, and persistence share the character lock.
+If central admission encounters a DB error, the worker retries confirmation before
+saving the accepted session. Once World admits the new session, old-session writes
+and force-logout requests cannot release or overwrite it. Headless bot persistence
+is bound to the announced world incarnation and its own player instance. Re-announcing the same incarnation after
 a network reconnect does not reset login state; an older incarnation cannot
 replace a newer one (incarnation startup times must increase for each node ID).
 These fences and operation metadata are internal protocol state, not save bytes
@@ -217,6 +223,9 @@ CRC rejection, per-character ordering, central logout failure and DB completion,
 retention of failed snapshots after reconnect, operation correlation, duplicate/late
 acknowledgements, reordered retries with equal playtime, authentication/save
 serialization, old-session/incarnation rejection, and cancellation permissions.
+Actual worker/World admission tests run in standalone and central modes, covering
+rejected duplicates, failed logouts followed by rejected reconnects, logouts queued
+between authentication and admission, accepted reconnects, and admission DB retry.
 The restart fixture boots the real world/map, admits a network-player character
 using an in-memory transport and the configured BotManager population, advances
 XP/inventory/bank/permanent variables/playtime, sends SIGTERM, and waits for actual

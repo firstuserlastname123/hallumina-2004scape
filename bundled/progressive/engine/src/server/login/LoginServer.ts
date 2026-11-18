@@ -118,6 +118,18 @@ export default class LoginServer {
     private readonly saveSessions = new Map<string, { worldId: string; sessionId: string; nodeId: number }>();
     private readonly saveOperations = new Map<string, SaveOperationState>();
 
+    private readonly loginCandidates = new Map<string, Map<string, {
+        worldId: string; nodeId: number; accountId: number;
+        previousOwner: { worldId: string; sessionId: string; nodeId: number } | undefined;
+        reserved: boolean;
+    }>>();
+
+    private stageAdmission(filename: string, sessionId: string, worldId: string, nodeId: number, accountId: number, reserved: boolean): void {
+        let candidates = this.loginCandidates.get(filename);
+        if (!candidates) { candidates = new Map(); this.loginCandidates.set(filename, candidates); }
+        candidates.set(sessionId, { worldId, nodeId, accountId, previousOwner: this.saveSessions.get(filename), reserved });
+    }
+
     rejectLoginForSafety(s: WebSocket, replyTo: number) {
         // Send opcode 7 ('Please try again') if something has gone wrong
         // during login attempt, which may be resolved by simply retrying.
@@ -179,6 +191,9 @@ export default class LoginServer {
                         const ready = (async () => {
                             for (const filename of this.worldCharacters.get(worldKey) ?? []) {
                                 await withPlayerSaveLock(filename, async () => {
+                                    this.loginCandidates.get(filename)?.forEach((candidate, sessionId, candidates) => {
+                                        if (candidate.nodeId === nodeId) candidates.delete(sessionId);
+                                    });
                                     if (this.saveSessions.get(filename)?.nodeId === nodeId) {
                                         this.saveSessions.delete(filename);
                                         this.saveOperations.delete(filename);
@@ -199,7 +214,7 @@ export default class LoginServer {
                         if (!world || this.worlds.get(worldKey)?.id !== worldId) throw new Error('Stale world incarnation');
                     };
                     try {
-                        if (['player_login', 'player_logout', 'player_autosave', 'player_force_logout'].includes(type)) {
+                        if (['player_login', 'player_admit', 'player_logout', 'player_autosave', 'player_force_logout'].includes(type)) {
                             assertCurrentWorld();
                             let characters = this.worldCharacters.get(worldKey);
                             if (!characters) { characters = new Set(); this.worldCharacters.set(worldKey, characters); }
@@ -315,20 +330,11 @@ export default class LoginServer {
 
                                 if (
                                     !reconnecting &&
+                                    !this.saveSessions.has(filename) &&
                                     account.logged_in === nodeId &&
                                     account.login_time !== null &&
                                     new Date(account.login_time).getTime() < Date.now() - Environment.NODE_HOP_TIME
                                 ) {
-                                    await db
-                                        .updateTable('account_login')
-                                        .set({
-                                            logged_in: 0,
-                                            login_time: null
-                                        })
-                                        .where('account_id', '=', account.id)
-                                        .where('profile', '=', profile)
-                                        .executeTakeFirst();
-
                                     account.logged_in = 0;
                                     account.login_time = null;
                                 }
@@ -355,8 +361,7 @@ export default class LoginServer {
                                             this.rejectLoginForSafety(s, replyTo);
                                             return;
                                         }
-                                        this.saveSessions.set(filename, { worldId, sessionId: socket, nodeId });
-                                        this.saveOperations.delete(filename);
+                                        this.stageAdmission(filename, socket, worldId, nodeId, account.id, false);
                                         s.send(
                                             JSON.stringify({
                                                 replyTo,
@@ -370,8 +375,7 @@ export default class LoginServer {
                                             })
                                         );
                                     } else {
-                                        this.saveSessions.set(filename, { worldId, sessionId: socket, nodeId });
-                                        this.saveOperations.delete(filename);
+                                        this.stageAdmission(filename, socket, worldId, nodeId, account.id, false);
                                         s.send(
                                             JSON.stringify({
                                                 replyTo,
@@ -488,11 +492,32 @@ export default class LoginServer {
                                         })
                                         .executeTakeFirst();
                                 }
-                                this.saveSessions.set(filename, { worldId, sessionId: socket, nodeId });
-                                this.saveOperations.delete(filename);
+                                this.stageAdmission(filename, socket, worldId, nodeId, account.id, true);
                             });
                         } finally {
                             this.loginRequests.delete(safeName);
+                        }
+                    } else if (type === 'player_admit') {
+                        const { replyTo, sessionId } = msg;
+                        try {
+                            await withPlayerSaveLock(filename, async () => {
+                                assertCurrentWorld();
+                                const owner = this.saveSessions.get(filename);
+                                if (owner && owner.worldId === worldId && owner.sessionId === sessionId) return;
+                                const candidates = this.loginCandidates.get(filename);
+                                const candidate = candidates?.get(sessionId);
+                                if (!candidate || candidate.worldId !== worldId || candidate.previousOwner !== owner) throw new Error('Stale login admission');
+                                await db.updateTable('account_login')
+                                    .set({ logged_in: nodeId, login_time: toDbDate(new Date()) })
+                                    .where('account_id', '=', candidate.accountId).where('profile', '=', profile).executeTakeFirst();
+                                this.saveSessions.set(filename, { worldId, sessionId, nodeId });
+                                this.saveOperations.delete(filename);
+                                candidates!.delete(sessionId);
+                            });
+                            s.send(JSON.stringify({ replyTo, response: 0, sessionId }));
+                        } catch (err) {
+                            console.error(err);
+                            s.send(JSON.stringify({ replyTo, response: 1, sessionId }));
                         }
                     } else if (type === 'player_logout' || type === 'player_autosave') {
                         const { replyTo, username, save, saveId, sessionId } = msg;
@@ -538,6 +563,22 @@ export default class LoginServer {
                         const { username, sessionId } = msg;
                         await withPlayerSaveLock(filename, async () => {
                             assertCurrentWorld();
+                            const candidates = this.loginCandidates.get(filename);
+                            const candidate = candidates?.get(sessionId);
+                            if (candidate && candidate.worldId === worldId) {
+                                candidates!.delete(sessionId);
+                                // Reject only this proposal. Never release an active owner
+                                // or a different candidate's account-login reservation.
+                                if (candidate.reserved && candidate.previousOwner === this.saveSessions.get(filename)) {
+                                    const successor = [...candidates!.values()].find(next => next.worldId === worldId && next.previousOwner === candidate.previousOwner);
+                                    if (successor) successor.reserved = true;
+                                    else await db.updateTable('account_login').set({ logged_in: 0, login_time: null })
+                                        .where('account_id', '=', candidate.accountId).where('profile', '=', profile)
+                                        .where('logged_in', '=', nodeId).executeTakeFirst();
+                                }
+                                return;
+                            }
+                            if (msg.candidateOnly) return;
                             const owner = this.saveSessions.get(filename);
                             if (!owner || owner.worldId !== worldId || owner.sessionId !== sessionId) return;
                             const account = await db

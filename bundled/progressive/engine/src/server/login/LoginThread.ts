@@ -11,6 +11,14 @@ import { trackLoginAttempts, trackLoginTime } from './LoginMetrics.js';
 const client = new LoginClient(Environment.NODE_ID);
 const localSaves = new Map<string, SaveOperationState>();
 const localSessions = new Map<string, string>();
+const localCandidates = new Map<string, Set<string>>();
+const pendingAdmissions = new Map<string, string>();
+
+async function confirmAdmission(username: string, sessionId: string): Promise<void> {
+    if (pendingAdmissions.get(username) !== sessionId) return;
+    if (!(await client.playerAdmit(username, sessionId))) throw new Error('Save session admission failed');
+    pendingAdmissions.delete(username);
+}
 
 if (!parentPort) throw new Error('This file must be run as a worker thread.');
 
@@ -70,7 +78,9 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
                 });
                 stopTimer();
             } else {
-                localSessions.set(username, socket);
+                let candidates = localCandidates.get(username);
+                if (!candidates) { candidates = new Set(); localCandidates.set(username, candidates); }
+                candidates.add(socket);
                 let staffmodlevel = 0;
 
                 if (!Environment.NODE_PRODUCTION) {
@@ -112,10 +122,22 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
             }
             break;
         }
+        case 'player_admit': {
+            const { username, sessionId } = msg;
+            if (Environment.LOGIN_SERVER) {
+                pendingAdmissions.set(username, sessionId);
+                await confirmAdmission(username, sessionId);
+            } else {
+                if (!localCandidates.get(username)?.delete(sessionId)) throw new Error('Unknown login candidate');
+                localSessions.set(username, sessionId);
+            }
+            break;
+        }
         case 'player_logout': {
             const { username, save, saveId, sessionId } = msg;
 
             if (Environment.LOGIN_SERVER) {
+                await confirmAdmission(username, sessionId);
                 const success = await client.playerLogout(username, save, msg);
 
                 parentPort.postMessage({
@@ -151,6 +173,7 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
             const { username, save, saveId, sessionId } = msg;
 
             if (Environment.LOGIN_SERVER) {
+                await confirmAdmission(username, sessionId);
                 await client.playerAutosave(username, save, msg);
             } else {
                 const profile = Environment.NODE_PROFILE;
@@ -169,9 +192,10 @@ async function handleRequests(parentPort: ParentPort, msg: any) {
             break;
         }
         case 'player_force_logout': {
+            localCandidates.get(msg.username)?.delete(msg.sessionId);
             if (Environment.LOGIN_SERVER) {
                 const { username } = msg;
-                await client.playerForceLogout(username, msg.sessionId);
+                await client.playerForceLogout(username, msg.sessionId, msg.candidateOnly);
             }
             break;
         }

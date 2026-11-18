@@ -64,6 +64,7 @@ const before = await fs.stat(filename);
 assert.equal((await request(oldSave)).success, true);
 assert.equal((await fs.stat(filename)).ino, before.ino, 'successful retry rewrote the file');
 await request({ type: 'player_login', username: player.username, socket: 'local-session-new', lowMemory: false, reconnecting: false });
+local.postMessage({ type: 'player_admit', username: player.username, sessionId: 'local-session-new' });
 assert.equal((await request(oldSave)).success, true); // cached success; no session/database side effects
 assert.equal((await fs.stat(filename)).ino, before.ino);
 player.stats[0] += 100;

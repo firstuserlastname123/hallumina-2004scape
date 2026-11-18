@@ -17,9 +17,22 @@ class MemoryClient extends ClientSocket {
     terminate() { this.close(); }
 }
 const restoring = process.argv[2] === 'restore';
-const raw = restoring ? fs.readFileSync('data/players/main/persistman.sav') : new Uint8Array();
-const human = PlayerLoading.load('persistman', new Packet(raw), new MemoryClient());
-World.newPlayers.add(human);
+const client = new MemoryClient();
+World.loginRequests.set(client.uuid, client);
+const loginThread = (World as any).loginThread;
+const login = new Promise<any>(resolve => {
+    const listener = (msg: any) => {
+        if (msg.type !== 'player_login' || msg.socket !== client.uuid) return;
+        loginThread.off('message', listener);
+        resolve(msg);
+    };
+    loginThread.on('message', listener);
+});
+loginThread.postMessage({ type: 'player_login', username: 'persistman', socket: client.uuid,
+    password: 'test', uid: 1, remoteAddress: client.remoteAddress, lowMemory: false, reconnecting: false, hasSave: false });
+assert.equal((await login).reply, restoring ? 0 : 4);
+const human = [...World.newPlayers].find(p => p.username === 'persistman')!;
+assert.ok(human);
 BotManager.init(World);
 (World as any).processLogins();
 const bots = [...World.playerLoop.all()].filter(p => p.is_bot);

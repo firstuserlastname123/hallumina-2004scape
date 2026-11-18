@@ -855,6 +855,7 @@ class World {
             if (this.logoutRequests.has(player.username)) {
                 player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - old session is mid-logout');
                 if (isClientConnected(player)) {
+                    this.releaseLogin(player.username, player.session);
                     player.client.send(Uint8Array.from([5]));
                     player.client.close();
                 }
@@ -876,6 +877,7 @@ class World {
                     if (other instanceof NetworkPlayer && player instanceof NetworkPlayer) {
                         other.client = player.client;
                         other.session = other.client.uuid;
+                        this.admitLogin(other);
                         other.client.send(Uint8Array.from([15]));
                     }
 
@@ -902,6 +904,7 @@ class World {
 
                 if (player instanceof NetworkPlayer) {
                     player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - already logged in');
+                    this.releaseLogin(player.username, player.session);
                     player.client.send(Uint8Array.from([5]));
                     player.client.close();
                 }
@@ -973,6 +976,7 @@ class World {
 
             this.gameMap.getZone(player.x, player.z, player.level).enter(player);
             player.onLogin();
+            if (isClientConnected(player)) this.admitLogin(player);
 
             if (this.shutdownTick != -1) {
                 player.write(new UpdateRebootTimer(this.shutdownTick - this.currentTick));
@@ -1667,13 +1671,17 @@ class World {
         });
     }
 
+    private admitLogin(player: Player): void {
+        this.loginThread.postMessage({ type: 'player_admit', username: player.username, sessionId: player.session });
+    }
+
+    private releaseLogin(username: string, sessionId: string): void {
+        this.loginThread.postMessage({ type: 'player_force_logout', username, sessionId, candidateOnly: true });
+    }
+
     // let the login server know this player can log in elsewhere, do not update save file
     forceLogout(player: Player, response = -1) {
-        this.loginThread.postMessage({
-            type: 'player_force_logout',
-            sessionId: player.session,
-            username: player.username
-        });
+        this.releaseLogin(player.username, player.session);
 
         if (isClientConnected(player)) {
             if (response !== -1) {
@@ -1886,6 +1894,9 @@ class World {
         if (isPlayerLoginResponse(msg)) {
             const { socket } = msg;
             if (!this.loginRequests.has(socket)) {
+                const admitted = this.getPlayerByUsername(msg.username)?.session === socket;
+                const queued = [...this.newPlayers].some(player => player.username === msg.username && player.session === socket);
+                if (!admitted && !queued && [0, 2, 4].includes(msg.reply)) this.releaseLogin(msg.username, socket);
                 return;
             }
 
@@ -1970,6 +1981,7 @@ class World {
 
                 if (this.logoutRequests.has(username)) {
                     // Retain unacknowledged snapshots even after the hop timer.
+                    this.releaseLogin(username, client.uuid);
                     client.send(Uint8Array.from([5]));
                     client.close();
                     return;
@@ -1980,11 +1992,7 @@ class World {
                     if (player.members) {
                         client.send(Uint8Array.from([17]));
                         client.close();
-                        this.loginThread.postMessage({
-                            type: 'player_force_logout',
-                            sessionId: client.uuid,
-                            username: username
-                        });
+                        this.releaseLogin(username, client.uuid);
                         return;
                     }
                     player.teleport(3221, 3219, 0);
@@ -2002,11 +2010,7 @@ class World {
                 client.close();
 
                 // todo: maybe we can tell the login thread to swap for the last-good save?
-                this.loginThread.postMessage({
-                    type: 'player_force_logout',
-                    sessionId: client.uuid,
-                    username: username
-                });
+                this.releaseLogin(username, client.uuid);
             }
         } else if (isPlayerLogoutResponse(msg)) {
             const { username, success, saveId } = msg;
