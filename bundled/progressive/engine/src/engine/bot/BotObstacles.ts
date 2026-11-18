@@ -87,7 +87,9 @@ export function tryObstacle(player: Player, loc: Loc, op: 1 | 2 | 3 | 4 | 5, cro
     if (!player.setInteraction(Interaction.ENGINE, loc, ServerTriggerType.APLOC1 + op - 1)) return false;
     if (approach.path.length) player.queueWaypoints(approach.path);
     s.pending = { loc, type: loc.type, angle: loc.angle, shape: loc.shape, tick: World.currentTick,
-        sourceX: player.x, sourceZ: player.z, owner: (player as Player & { _bot?: BotPlayer })._bot?.activeTask, crossing };
+        // A legitimate approach can circle to the opposite face. Verify passage
+        // from that operating position, rather than the side where we clicked.
+        sourceX: approach.x, sourceZ: approach.z, owner: (player as Player & { _bot?: BotPlayer })._bot?.activeTask, crossing };
     BotLog.event('debug', player.username, crossing ? 'transition_attempt' : 'gate_attempt', `Interact op${op} at (${loc.x},${loc.z},${loc.level})`);
     return true;
 }

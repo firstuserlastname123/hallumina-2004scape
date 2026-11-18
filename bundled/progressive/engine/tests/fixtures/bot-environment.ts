@@ -14,6 +14,8 @@ const { WoodcuttingTask } = await import('#/engine/bot/tasks/WoodcuttingTask.js'
 const { ProgressWatchdog } = await import('#/engine/bot/tasks/BotTaskBase.js');
 const { AgilityTask } = await import('#/engine/bot/tasks/AgilityTask.js');
 const { default: ScriptState } = await import('#/engine/script/ScriptState.js');
+const { hasPendingObstacle, pollObstacle } = await import('#/engine/bot/BotObstacles.js');
+const { findLocApproach } = await import('#/engine/bot/BotNavigation.js');
 await World.start(false, false);
 setWorld(World);
 BotCollisionMap.init('data/bot/unwalkable_tiles.csv');
@@ -101,6 +103,33 @@ check('locked door stays closed and is suppressed after a failed real interactio
     World.currentTick += 201;
     for(let i=0;i<80;i++) { openNearbyGate(b.player,1); engineTick(b.player); }
     assert.equal(scripts,2,'an expired suppression must permit a later legitimate retry');
+    assert.equal((b as any).pendingTeleport,null);
+});
+check('native door crossing is verified from its reachable operating side after a detour', () => {
+    const b=bot(3203,3174);
+    b.player.run=0;
+    const door=findLocByName(3202,3169,0,'zanarisdoor',0)!;
+    assert.ok(door);
+    const approach=findLocApproach(b.player,door)!;
+    assert.ok(approach);
+    assert.equal(approach.x,3201,'native approach goes around to the other side');
+    let scriptTick=-1;
+    const start=World.currentTick;
+    const execute=b.player.executeScript.bind(b.player);
+    b.player.executeScript=(...args)=>{
+        if (!args[2] && args[0].script.name==='[oploc1,zanarisdoor]') scriptTick=World.currentTick-start;
+        return execute(...args);
+    };
+    assert.equal(openNearbyGate(b.player,5),true);
+    assert.equal(b.player.target,door);
+    for(let i=0;i<24 && hasPendingObstacle(b.player);i++) {
+        engineTick(b.player);
+        pollObstacle(b.player);
+    }
+    assert.ok(scriptTick>0 && scriptTick<25,'the native interaction finishes within the existing deadline');
+    assert.deepEqual([b.player.x,b.player.z],[3202,3169],'the native door script carries the player through');
+    assert.equal(hasPendingObstacle(b.player),false,'successful passage must not wait for a false timeout');
+    assert.equal(b.navigation.failures,0);
     assert.equal((b as any).pendingTeleport,null);
 });
 check('pending climb survives repeated walk requests until actual floor transition', () => {

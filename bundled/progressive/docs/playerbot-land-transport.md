@@ -42,7 +42,7 @@ Each leg issues one native click and retains ownership through dialogue and dela
 
 ## Regression and persistence validation
 
-The combined playerbot, native-runtime, persistence and build-integrity suite passed **32 tests, zero failures**: 18 reliability cases, four native-runtime fixtures, five persistence cases and five integrity cases including their parent. The transport fixture was subsequently expanded to cover Barnaby's alternate menu, the plantation customs branch and the reverse tunnel; that fixture alone was rerun and passed all **18 internal scenarios**. No production source changed after the final population runs.
+The combined playerbot, native-runtime, persistence and build-integrity suite passed **32 tests, zero failures**: 18 reliability cases, four native-runtime fixtures, five persistence cases and five integrity cases including their parent. The transport fixture was subsequently expanded to cover Barnaby's alternate menu, the plantation customs branch and the reverse tunnel; that fixture alone was rerun and passed all **18 internal scenarios**. The later focused gate-verification correction below has separate regression validation; the retained population runs measure the earlier production source at `1a0ba61`.
 
 The completed reproductions against the original PR #4 head establish the travelling-watchdog and oversized-waypoint failures described above. The original manager also fails the fresh-quest-state assertion. The older environmental reproductions remain in the historical report.
 
@@ -66,6 +66,44 @@ node --import tsx --test tests/bot-reliability.test.ts tests/bot-runtime.test.ts
 ```
 
 The final TypeScript check retains the same eleven pre-existing protocol diagnostics as the base, with normalized diagnostics unchanged. New travel, dialogue and region modules pass focused ESLint checks.
+
+## Focused gate and oscillation review
+
+The [focused diagnostic results](playerbot-gate-review-results.json) retain the measured distances, native script times, before/after reproduction and actual movement cycles. This follow-up changes only the side used to verify a door crossing; **the 25-tick deadline still starts when the interaction is queued**. Retry budgets, cooldowns, gate search radii, collision and the oscillation detector are unchanged.
+
+### Calling distances, movement and visibility
+
+The main path fallback calls `openGateToward(..., 8)`; most skilling/banking recovery calls use `openNearbyGate(..., 5)` or `8`. Some combat, bankstand and vendor recovery calls explicitly request 12, 20 or 30. The shared loc finder uses Manhattan distance up to twice its requested radius, within the zones it visits, so a radius of 8 does not guarantee an eight-tile maximum. Generic floor-gateway searches are centered on the approach tile after the bot has approached it.
+
+`tryObstacle` starts in WALK mode. Native `Player.updateMovement` then uses persistent run state and a valid run animation; walking advances one tile per tick and running up to two, subject to collision and energy. The measured examples include actual approach detours and native script dispatch:
+
+| Real-map interaction | Initial Chebyshev distance | Approach path steps | Native script starts | Result |
+| --- | ---: | ---: | ---: | --- |
+| Sheep gate from `(3213,3253)` walking | 8 | 7 | tick 8 | Verified at tick 8 |
+| Sheep gate from its non-operable side `(3214,3261)` | 1 | 1 | tick 2 | Verified at tick 2 |
+| Cow gate at `(3241,3301)` running | 4 | 4 | tick 3 | Verified at tick 3 |
+| Locked Varrock door at `(3273,3417)` | 0 | 0 | tick 1 | Still locked; bounded failure at tick 25 |
+| Tutorial Island door from `(3097,3107)` | 1 | 0 | tick 1 | Native refusal; bounded failure at tick 25 |
+
+These cases provide no evidence that starting the timer at queueing is itself defective. The Gnome south-gate probe also shows Femi's initial dialogue/help sequence finishing outside the gate: access establishment is not passage. A north-side interaction that can pass dispatches at tick 4 and verifies at tick 6.
+
+The actual r254 scenery handler checks the client's **104-tile build area**, rejecting clicks outside `originX/originZ ±52`. That is distinct from NPC draw distance. These probes do not establish that the normal short-range gate searches acquire objects outside that area. The wider generic recovery searches deserve a future gate-specific build-area check if such a violation is reproduced; imposing an arbitrary NPC-style radius or changing the shared resource loc finder is not justified by this evidence. No acquisition-policy change is included here.
+
+### Reproduced verification defect
+
+From `(3203,3174)`, a radius-5 search selects the native `zanarisdoor` at `(3202,3169)`. The valid five-step approach goes around to `(3201,3169)`, on the opposite side from the queueing position. Its native `open_and_close_door2` script starts at tick 6 and carries the character through to `(3202,3169)`, temporarily replacing the original door with an invisible wall.
+
+Previously, verification compared the final position with the **queueing** side and tested the temporarily blocked edge. It missed the completed native crossing and reported failure at tick 25. The new regression fails on `ef8f9fe`. Recording the validated **operating** position as the crossing source verifies success at tick 6. The original barrier must still change; this does not authorize passage through a locked or unchanged door. No quest flag, item, XP, fare or recovery teleport is changed.
+
+The independent population observer also requires an open collision edge for a gate opening; native doors that temporarily replace themselves with invisible walls can therefore remain "unverified" even after a scripted crossing. That metric is not interchangeable with production obstacle-timeout reports. The existing measurements are retained without relabeling successful results or changing the observer to improve a score. This single reproduction does not explain every additional report.
+
+### Oscillation evidence and validation boundary
+
+Rate-limited population logs contain 44 emitted oscillation lines before and 88 after, versus raw observer counts of 69 and 135. Combat accounts for 31 and 65 emitted lines respectively; Mine accounts for 12 and 23, with one baseline ShopTrip line. Emitted logs do not provide complete position histories and cannot establish the cause of the raw increase.
+
+A small diagnostic using three selected characters and 1,000 full native world ticks captures two actual Mining approach cycles: `(3285,3363) ↔ (3285,3364)` and `(3286,3365) ↔ (3284,3365)`, each repeated three times. Its task goals alternate among nearby rocks. This confirms real movement/reselection, not stationary false positives. Recovery remains bounded and the miner subsequently earns 6,300 internal Mining XP. The two Combat probes do not reproduce an oscillation; their absence in this small diagnostic does not resolve the population Combat increase. Resource-target retention and broader combat investigation remain documented work rather than changes to the detector in this patch.
+
+The complete **32-test playerbot, persistence and r254-integrity suite passes again**, including the new actual-map crossing regression and existing locked doors, floor transitions and transportation tests. The completed 100-bot comparisons below are preserved, explicitly measuring source `1a0ba61` before this follow-up. They do not measure this correction's aggregate effect; no additional full population simulations were run for this narrow change.
 
 ## Comparable 100-bot validation
 
@@ -162,5 +200,7 @@ Steady world mean processing increases from 12.53 → 14.02ms and 12.33 → 12.8
 ## Remaining limitations
 
 The risk estimate is specific to the audited mountain alternatives, not a complete threat atlas of Gielinor. It does not predict exact monster damage, automatically consume food, or promise that the Karamja transfer is risk-free. Selection is stable for a journey rather than recalculated every tick. Other methods and quest routes remain bounded/deferred when the existing graph or requirements cannot support them; this phase does not add a quest-solving system.
+
+Experienced bots should eventually have varied, plausible quest histories. A future, separate change could initialize quest history **once when creating a new character**, from that character's profile, respecting quest prerequisites and then persisting the result. Existing saves and partial progress must remain untouched; login must never reapply initialization. This opportunity does not authorize unconditional quest completion, and implementing quest diversity is outside PR #4.
 
 Journey intent, origin/return reservations and ambiguous-payment quarantine are transient bot-session state. Character saves retain their existing format, but crash recovery in the middle of a paid voyage has not been validated with a durable transport receipt ledger. No refund or recovery teleport is added for that ambiguity. Existing unrelated task-specific travel/startup policies outside these corrections remain outside this report.
