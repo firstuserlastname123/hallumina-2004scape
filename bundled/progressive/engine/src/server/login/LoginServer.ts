@@ -1,6 +1,8 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 
+import { withPlayerSaveLock, writePlayerSave, checkSaveOperation, type SaveOperationState } from '#/server/login/PlayerSave.js';
+
 import { compare, hashSync } from 'bcrypt-ts';
 import { WebSocket, WebSocketServer } from 'ws';
 
@@ -111,6 +113,22 @@ async function updateHiscores(account: { id: number, staffmodlevel: number, bann
 export default class LoginServer {
     private server: WebSocketServer;
     private loginRequests: Set<string> = new Set();
+    private readonly worlds = new Map<string, { id: string; startedAt: number; ready: Promise<void> }>();
+    private readonly worldCharacters = new Map<string, Set<string>>();
+    private readonly saveSessions = new Map<string, { worldId: string; sessionId: string; nodeId: number }>();
+    private readonly saveOperations = new Map<string, SaveOperationState>();
+
+    private readonly loginCandidates = new Map<string, Map<string, {
+        worldId: string; nodeId: number; accountId: number;
+        previousOwner: { worldId: string; sessionId: string; nodeId: number } | undefined;
+        reserved: boolean;
+    }>>();
+
+    private stageAdmission(filename: string, sessionId: string, worldId: string, nodeId: number, accountId: number, reserved: boolean): void {
+        let candidates = this.loginCandidates.get(filename);
+        if (!candidates) { candidates = new Map(); this.loginCandidates.set(filename, candidates); }
+        candidates.set(sessionId, { worldId, nodeId, accountId, previousOwner: this.saveSessions.get(filename), reserved });
+    }
 
     rejectLoginForSafety(s: WebSocket, replyTo: number) {
         // Send opcode 7 ('Please try again') if something has gone wrong
@@ -157,17 +175,57 @@ export default class LoginServer {
                     const msg = JSON.parse(data.toString());
                     const { type, nodeId, nodeTime, profile } = msg;
 
+                    const worldKey = `${profile}/${nodeId}`;
+                    const { worldId } = msg;
                     if (type === 'world_startup') {
-                        await db
-                            .updateTable('account_login')
-                            .set({
-                                logged_in: 0,
-                                login_time: null
-                            })
-                            .where('logged_in', '=', nodeId)
-                            .where('profile', '=', profile)
-                            .execute();
-                    } else if (type === 'player_login') {
+                        const previous = this.worlds.get(worldKey);
+                        if (previous && previous.id === worldId) {
+                            try { await previous.ready; return; } catch { /* retry a failed startup reset */ }
+                        }
+                        if (typeof worldId !== 'string' || !worldId || !Number.isSafeInteger(msg.worldStartedAt) ||
+                            (previous && previous.id !== worldId && msg.worldStartedAt <= previous.startedAt)) {
+                            throw new Error('Stale world incarnation');
+                        }
+                        // Fence the previous world's requests immediately, then wait for
+                        // any accepted persistence/login to finish before resetting it.
+                        const ready = (async () => {
+                            for (const filename of this.worldCharacters.get(worldKey) ?? []) {
+                                await withPlayerSaveLock(filename, async () => {
+                                    this.loginCandidates.get(filename)?.forEach((candidate, sessionId, candidates) => {
+                                        if (candidate.nodeId === nodeId) candidates.delete(sessionId);
+                                    });
+                                    if (this.saveSessions.get(filename)?.nodeId === nodeId) {
+                                        this.saveSessions.delete(filename);
+                                        this.saveOperations.delete(filename);
+                                    }
+                                });
+                            }
+                            await db.updateTable('account_login')
+                                .set({ logged_in: 0, login_time: null })
+                                .where('logged_in', '=', nodeId).where('profile', '=', profile).execute();
+                        })();
+                        this.worlds.set(worldKey, { id: worldId, startedAt: msg.worldStartedAt, ready });
+                        await ready;
+                        return;
+                    }
+                    const world = this.worlds.get(worldKey);
+                    const filename = `data/players/${profile}/${msg.username}.sav`;
+                    const assertCurrentWorld = () => {
+                        if (!world || this.worlds.get(worldKey)?.id !== worldId) throw new Error('Stale world incarnation');
+                    };
+                    try {
+                        if (['player_login', 'player_admit', 'player_logout', 'player_autosave', 'player_force_logout'].includes(type)) {
+                            assertCurrentWorld();
+                            let characters = this.worldCharacters.get(worldKey);
+                            if (!characters) { characters = new Set(); this.worldCharacters.set(worldKey, characters); }
+                            characters.add(filename);
+                            await world!.ready;
+                        }
+                    } catch {
+                        if (msg.replyTo !== undefined) s.send(JSON.stringify({ replyTo: msg.replyTo, response: type === 'player_login' ? 7 : 1, saveId: msg.saveId }));
+                        return;
+                    }
+                    if (type === 'player_login') {
                         const { nodeMembers, replyTo, username, password, uid, socket, remoteAddress, reconnecting, hasSave } = msg;
                         const safeName = toSafeName(username);
                         
@@ -183,44 +241,21 @@ export default class LoginServer {
                         this.loginRequests.add(safeName);
 
                         try {
-                            const ipBan = await db.selectFrom('ipban').selectAll().where('ip', '=', remoteAddress).executeTakeFirst();
+                            await withPlayerSaveLock(filename, async () => {
+                                assertCurrentWorld();
+                                const ipBan = await db.selectFrom('ipban').selectAll().where('ip', '=', remoteAddress).executeTakeFirst();
 
-                            if (ipBan) {
-                                s.send(
-                                    JSON.stringify({
-                                        replyTo,
-                                        response: 7
-                                    })
-                                );
-                                return;
-                            }
-
-                            let account = await db.selectFrom('account')
-                                .leftJoin('account_login', join => join
-                                    .onRef('account_id', '=', 'id')
-                                    .on('profile', '=', profile)
-                                )
-                                .where('username', '=', username)
-                                .selectAll()
-                                .executeTakeFirst();
-
-                            if (!Environment.WEBSITE_REGISTRATION && !account) {
-                                // register the user automatically
-                                const insertResult = await db
-                                    .insertInto('account')
-                                    .values({
-                                        username,
-                                        password: hashSync(password.toLowerCase(), 10),
-                                        registration_ip: remoteAddress,
-                                        registration_date: toDbDate(new Date())
-                                    })
-                                    .executeTakeFirst();
-
-                                if (typeof insertResult.insertId === 'undefined') {
+                                if (ipBan) {
+                                    s.send(
+                                        JSON.stringify({
+                                            replyTo,
+                                            response: 7
+                                        })
+                                    );
                                     return;
                                 }
 
-                                account = await db.selectFrom('account')
+                                let account = await db.selectFrom('account')
                                     .leftJoin('account_login', join => join
                                         .onRef('account_id', '=', 'id')
                                         .on('profile', '=', profile)
@@ -228,67 +263,161 @@ export default class LoginServer {
                                     .where('username', '=', username)
                                     .selectAll()
                                     .executeTakeFirst();
-                            }
 
-                            if (!account || !(await compare(password.toLowerCase(), account.password))) {
-                                // invalid username or password
-                                s.send(
-                                    JSON.stringify({
-                                        replyTo,
-                                        response: 1
-                                    })
-                                );
-                                return;
-                            }
+                                if (!Environment.WEBSITE_REGISTRATION && !account) {
+                                    // register the user automatically
+                                    const insertResult = await db
+                                        .insertInto('account')
+                                        .values({
+                                            username,
+                                            password: hashSync(password.toLowerCase(), 10),
+                                            registration_ip: remoteAddress,
+                                            registration_date: toDbDate(new Date())
+                                        })
+                                        .executeTakeFirst();
 
-                            if (account.banned_until !== null && new Date(account.banned_until) > new Date()) {
-                                // account disabled
-                                s.send(
-                                    JSON.stringify({
-                                        replyTo,
-                                        response: 5
-                                    })
-                                );
-                                return;
-                            }
+                                    if (typeof insertResult.insertId === 'undefined') {
+                                        return;
+                                    }
 
-                            if (nodeMembers && !account.members) {
-                                if (Environment.NODE_AUTO_SUBSCRIBE_MEMBERS) {
-                                    // Set members=1 for the account and proceed with login
-                                    await db.updateTable('account').where('id', '=', account.id).set('members', 1).executeTakeFirstOrThrow();
-                                    account.members = 1;
-                                } else {
+                                    account = await db.selectFrom('account')
+                                        .leftJoin('account_login', join => join
+                                            .onRef('account_id', '=', 'id')
+                                            .on('profile', '=', profile)
+                                        )
+                                        .where('username', '=', username)
+                                        .selectAll()
+                                        .executeTakeFirst();
+                                }
+
+                                if (!account || !(await compare(password.toLowerCase(), account.password))) {
+                                    // invalid username or password
                                     s.send(
                                         JSON.stringify({
                                             replyTo,
-                                            response: 9
+                                            response: 1
                                         })
                                     );
                                     return;
                                 }
-                            }
 
-                            if (
-                                !reconnecting &&
-                                account.logged_in === nodeId &&
-                                account.login_time !== null &&
-                                new Date(account.login_time).getTime() < Date.now() - Environment.NODE_HOP_TIME
-                            ) {
-                                await db
-                                    .updateTable('account_login')
-                                    .set({
-                                        logged_in: 0,
-                                        login_time: null
-                                    })
-                                    .where('account_id', '=', account.id)
-                                    .where('profile', '=', profile)
-                                    .executeTakeFirst();
+                                if (account.banned_until !== null && new Date(account.banned_until) > new Date()) {
+                                    // account disabled
+                                    s.send(
+                                        JSON.stringify({
+                                            replyTo,
+                                            response: 5
+                                        })
+                                    );
+                                    return;
+                                }
 
-                                account.logged_in = 0;
-                                account.login_time = null;
-                            }
+                                if (nodeMembers && !account.members) {
+                                    if (Environment.NODE_AUTO_SUBSCRIBE_MEMBERS) {
+                                        // Set members=1 for the account and proceed with login
+                                        await db.updateTable('account').where('id', '=', account.id).set('members', 1).executeTakeFirstOrThrow();
+                                        account.members = 1;
+                                    } else {
+                                        s.send(
+                                            JSON.stringify({
+                                                replyTo,
+                                                response: 9
+                                            })
+                                        );
+                                        return;
+                                    }
+                                }
 
-                            if (reconnecting && account.logged_in === nodeId) {
+                                if (
+                                    !reconnecting &&
+                                    !this.saveSessions.has(filename) &&
+                                    account.logged_in === nodeId &&
+                                    account.login_time !== null &&
+                                    new Date(account.login_time).getTime() < Date.now() - Environment.NODE_HOP_TIME
+                                ) {
+                                    account.logged_in = 0;
+                                    account.login_time = null;
+                                }
+
+                                if (reconnecting && account.logged_in === nodeId) {
+                                    await db
+                                        .insertInto('session')
+                                        .values({
+                                            uuid: socket,
+                                            account_id: account.id,
+                                            profile,
+                                            world: nodeId,
+                                            timestamp: toDbDate(nodeTime),
+                                            uid,
+                                            ip: remoteAddress
+                                        })
+                                        .execute();
+
+                                    if (!hasSave) {
+                                        const save = await fsp.readFile(`data/players/${profile}/${username}.sav`);
+                                        if (!save || !PlayerLoading.verify(new Packet(save))) {
+                                            // Extreme safety check for savefile existing but having bad data on read:
+                                            console.error('on reconnect, account_id %s had invalid save data on disk', account.id);
+                                            this.rejectLoginForSafety(s, replyTo);
+                                            return;
+                                        }
+                                        this.stageAdmission(filename, socket, worldId, nodeId, account.id, false);
+                                        s.send(
+                                            JSON.stringify({
+                                                replyTo,
+                                                response: 2,
+                                                account_id: account.id,
+                                                staffmodlevel: account.staffmodlevel,
+                                                muted_until: account.muted_until,
+                                                save: save.toString('base64'),
+                                                members: account.members,
+                                                messageCount: 0
+                                            })
+                                        );
+                                    } else {
+                                        this.stageAdmission(filename, socket, worldId, nodeId, account.id, false);
+                                        s.send(
+                                            JSON.stringify({
+                                                replyTo,
+                                                response: 2,
+                                                account_id: account.id,
+                                                staffmodlevel: account.staffmodlevel,
+                                                muted_until: account.muted_until,
+                                                members: account.members,
+                                                messageCount: 0
+                                            })
+                                        );
+                                    }
+                                    return;
+                                } else if (account.logged_in !== null && account.logged_in !== 0) {
+                                    // already logged in elsewhere
+                                    s.send(
+                                        JSON.stringify({
+                                            replyTo,
+                                            response: 3
+                                        })
+                                    );
+                                    return;
+                                } else if (
+                                    account.staffmodlevel < 2 &&
+                                    account.logged_out !== 0 &&
+                                    account.logged_out !== nodeId &&
+                                    account.logout_time !== null
+                                ) {
+                                    const remaining = new Date(account.logout_time).getTime() - new Date(Date.now() - Environment.NODE_HOP_TIME).getTime();
+                                    if (remaining > 0) {
+                                        // rate limited (hop timer)
+                                        s.send(
+                                            JSON.stringify({
+                                                replyTo,
+                                                response: 10,
+                                                remaining
+                                            })
+                                        );
+                                        return;
+                                    }
+                                }
+
                                 await db
                                     .insertInto('session')
                                     .values({
@@ -302,228 +431,183 @@ export default class LoginServer {
                                     })
                                     .execute();
 
-                                if (!hasSave) {
-                                    const save = await fsp.readFile(`data/players/${profile}/${username}.sav`);
-                                    if (!save || !PlayerLoading.verify(new Packet(save))) {
-                                        // Extreme safety check for savefile existing but having bad data on read:
-                                        console.error('on reconnect, account_id %s had invalid save data on disk', account.id);
+                                if (!fs.existsSync(`data/players/${profile}/${username}.sav`)) {
+                                    // not an error - never logged in before
+                                    // ^ Only not an error if the user has never logged in before:
+                                    if (account.logout_time !== null) {
+                                        console.error('on login, account_id %s had no save data on disk!', account.id);
                                         this.rejectLoginForSafety(s, replyTo);
+                                        return;
+                                    } else {
+                                        s.send(
+                                            JSON.stringify({
+                                                replyTo,
+                                                response: 4,
+                                                account_id: account.id,
+                                                staffmodlevel: account.staffmodlevel,
+                                                muted_until: account.muted_until,
+                                                messageCount: 0
+                                            })
+                                        );
+                                    }
+                                } else {
+                                    const save = await fsp.readFile(`data/players/${profile}/${username}.sav`);
+                                    // Extreme safety check for savefile existing but having bad data on read:
+                                    if (!save || !PlayerLoading.verify(new Packet(save))) {
+                                        console.error('on login, account_id %s had invalid save data on disk!', account.id);
+                                        this.rejectLoginForSafety(s, replyTo);
+                                        return;
                                     }
                                     s.send(
                                         JSON.stringify({
                                             replyTo,
-                                            response: 2,
+                                            response: 0,
                                             account_id: account.id,
                                             staffmodlevel: account.staffmodlevel,
-                                            muted_until: account.muted_until,
                                             save: save.toString('base64'),
-                                            members: account.members,
-                                            messageCount: 0
-                                        })
-                                    );
-                                } else {
-                                    s.send(
-                                        JSON.stringify({
-                                            replyTo,
-                                            response: 2,
-                                            account_id: account.id,
-                                            staffmodlevel: account.staffmodlevel,
                                             muted_until: account.muted_until,
                                             members: account.members,
                                             messageCount: 0
                                         })
                                     );
                                 }
-                                return;
-                            } else if (account.logged_in !== null && account.logged_in !== 0) {
-                                // already logged in elsewhere
-                                s.send(
-                                    JSON.stringify({
-                                        replyTo,
-                                        response: 3
-                                    })
-                                );
-                                return;
-                            } else if (
-                                account.staffmodlevel < 2 &&
-                                account.logged_out !== 0 &&
-                                account.logged_out !== nodeId &&
-                                account.logout_time !== null
-                            ) {
-                                const remaining = new Date(account.logout_time).getTime() - new Date(Date.now() - Environment.NODE_HOP_TIME).getTime();
-                                if (remaining > 0) {
-                                    // rate limited (hop timer)
-                                    s.send(
-                                        JSON.stringify({
-                                            replyTo,
-                                            response: 10,
-                                            remaining
+
+                                // Login is valid - update account table
+                                if (account.account_id) {
+                                    await db.updateTable('account_login')
+                                        .set({
+                                            logged_in: nodeId,
+                                            login_time: toDbDate(new Date())
                                         })
-                                    );
-                                    return;
-                                }
-                            }
-
-                            await db
-                                .insertInto('session')
-                                .values({
-                                    uuid: socket,
-                                    account_id: account.id,
-                                    profile,
-                                    world: nodeId,
-                                    timestamp: toDbDate(nodeTime),
-                                    uid,
-                                    ip: remoteAddress
-                                })
-                                .execute();
-
-                            if (!fs.existsSync(`data/players/${profile}/${username}.sav`)) {
-                                // not an error - never logged in before
-                                // ^ Only not an error if the user has never logged in before:
-                                if (account.logout_time !== null) {
-                                    console.error('on login, account_id %s had no save data on disk!', account.id);
-                                    this.rejectLoginForSafety(s, replyTo);
-                                    return;
+                                        .where('account_id', '=', account.id)
+                                        .where('profile', '=', profile)
+                                        .executeTakeFirst();
                                 } else {
-                                    s.send(
-                                        JSON.stringify({
-                                            replyTo,
-                                            response: 4,
+                                    await db.insertInto('account_login')
+                                        .values({
                                             account_id: account.id,
-                                            staffmodlevel: account.staffmodlevel,
-                                            muted_until: account.muted_until,
-                                            messageCount: 0
+                                            profile: profile,
+                                            logged_in: nodeId,
+                                            login_time: toDbDate(new Date())
                                         })
-                                    );
+                                        .executeTakeFirst();
                                 }
-                            } else {
-                                const save = await fsp.readFile(`data/players/${profile}/${username}.sav`);
-                                // Extreme safety check for savefile existing but having bad data on read:
-                                if (!save || !PlayerLoading.verify(new Packet(save))) {
-                                    console.error('on login, account_id %s had invalid save data on disk!', account.id);
-                                    this.rejectLoginForSafety(s, replyTo);
-                                    return;
-                                }
-                                s.send(
-                                    JSON.stringify({
-                                        replyTo,
-                                        response: 0,
-                                        account_id: account.id,
-                                        staffmodlevel: account.staffmodlevel,
-                                        save: save.toString('base64'),
-                                        muted_until: account.muted_until,
-                                        members: account.members,
-                                        messageCount: 0
-                                    })
-                                );
-                            }
-
-                            // Login is valid - update account table
-                            if (account.account_id) {
+                                this.stageAdmission(filename, socket, worldId, nodeId, account.id, true);
+                            });
+                        } finally {
+                            this.loginRequests.delete(safeName);
+                        }
+                    } else if (type === 'player_admit') {
+                        const { replyTo, sessionId } = msg;
+                        try {
+                            await withPlayerSaveLock(filename, async () => {
+                                assertCurrentWorld();
+                                const owner = this.saveSessions.get(filename);
+                                if (owner && owner.worldId === worldId && owner.sessionId === sessionId) return;
+                                const candidates = this.loginCandidates.get(filename);
+                                const candidate = candidates?.get(sessionId);
+                                // Consecutive reconnects can authenticate against one earlier
+                                // owner. World must name the actual current predecessor to
+                                // authorize the later handoff within the same world.
+                                const followsOwner = owner && owner.worldId === worldId && owner.nodeId === nodeId &&
+                                    candidate?.previousOwner?.worldId === worldId && msg.previousSessionId === owner.sessionId;
+                                if (!candidate || candidate.worldId !== worldId || (candidate.previousOwner !== owner && !followsOwner)) throw new Error('Stale login admission');
                                 await db.updateTable('account_login')
+                                    .set({ logged_in: nodeId, login_time: toDbDate(new Date()) })
+                                    .where('account_id', '=', candidate.accountId).where('profile', '=', profile).executeTakeFirst();
+                                this.saveSessions.set(filename, { worldId, sessionId, nodeId });
+                                this.saveOperations.delete(filename);
+                                candidates!.delete(sessionId);
+                            });
+                            s.send(JSON.stringify({ replyTo, response: 0, sessionId }));
+                        } catch (err) {
+                            console.error(err);
+                            s.send(JSON.stringify({ replyTo, response: 1, sessionId }));
+                        }
+                    } else if (type === 'player_logout' || type === 'player_autosave') {
+                        const { replyTo, username, save, saveId, sessionId } = msg;
+                        try {
+                            await withPlayerSaveLock(filename, async () => {
+                                assertCurrentWorld();
+                                let owner = this.saveSessions.get(filename);
+                                const account = await db.selectFrom('account')
+                                    .leftJoin('account_login', join => join.onRef('account_id', '=', 'id').on('profile', '=', profile))
+                                    .where('username', '=', username).selectAll().executeTakeFirst();
+                                // Headless bots never authenticate through LoginClient.
+                                // Their owner is the announced world incarnation, not a
+                                // client-controllable replacement for a human session.
+                                if (!owner && account?.password === '!bot' && !account.logged_in) {
+                                    owner = { worldId, sessionId, nodeId };
+                                    this.saveSessions.set(filename, owner);
+                                }
+                                if (!owner || owner.worldId !== worldId || owner.sessionId !== sessionId) throw new Error('Stale save session');
+                                if (checkSaveOperation(msg, this.saveOperations.get(filename))) return;
+                                const operation = { saveId, saveSequence: msg.saveSequence, sessionId, completed: false };
+                                this.saveOperations.set(filename, operation);
+                                const raw = Buffer.from(save, 'base64');
+                                if (!PlayerLoading.verify(new Packet(raw)) || await this.wouldResetSaveFile(raw, profile, username)) {
+                                    throw new Error(`${username}: Invalid or regressing save file`);
+                                }
+                                await writePlayerSave(filename, raw);
+                                if (type === 'player_logout') {
+                                    await updateHiscores(account, PlayerLoading.load(username, new Packet(raw), null), profile);
+                                    if (account?.account_id) {
+                                        await db.updateTable('account_login')
+                                            .set({ logged_in: 0, login_time: null, logged_out: nodeId, logout_time: toDbDate(new Date()) })
+                                            .where('account_id', '=', account.id).where('profile', '=', profile).executeTakeFirst();
+                                    }
+                                }
+                                operation.completed = true;
+                            });
+                            if (type === 'player_logout') s.send(JSON.stringify({ replyTo, response: 0, saveId }));
+                        } catch (err) {
+                            console.error(err);
+                            if (type === 'player_logout') s.send(JSON.stringify({ replyTo, response: 1, saveId }));
+                        }
+                    } else if (type === 'player_force_logout') {
+                        const { username, sessionId } = msg;
+                        await withPlayerSaveLock(filename, async () => {
+                            assertCurrentWorld();
+                            const candidates = this.loginCandidates.get(filename);
+                            const candidate = candidates?.get(sessionId);
+                            if (candidate && candidate.worldId === worldId) {
+                                candidates!.delete(sessionId);
+                                // Reject only this proposal. Never release an active owner
+                                // or a different candidate's account-login reservation.
+                                if (candidate.reserved && candidate.previousOwner === this.saveSessions.get(filename)) {
+                                    const successor = [...candidates!.values()].find(next => next.worldId === worldId && next.previousOwner === candidate.previousOwner);
+                                    if (successor) successor.reserved = true;
+                                    else await db.updateTable('account_login').set({ logged_in: 0, login_time: null })
+                                        .where('account_id', '=', candidate.accountId).where('profile', '=', profile)
+                                        .where('logged_in', '=', nodeId).executeTakeFirst();
+                                }
+                                return;
+                            }
+                            if (msg.candidateOnly) return;
+                            const owner = this.saveSessions.get(filename);
+                            if (!owner || owner.worldId !== worldId || owner.sessionId !== sessionId) return;
+                            const account = await db
+                                .selectFrom('account')
+                                .leftJoin('account_login', join => join
+                                    .onRef('account_id', '=', 'id')
+                                    .on('profile', '=', profile)
+                                )
+                                .where('username', '=', username)
+                                .selectAll()
+                                .executeTakeFirst();
+
+                            if (account?.account_id) {
+                                await db
+                                    .updateTable('account_login')
                                     .set({
-                                        logged_in: nodeId,
-                                        login_time: toDbDate(new Date())
+                                        logged_in: 0,
+                                        login_time: null
                                     })
                                     .where('account_id', '=', account.id)
                                     .where('profile', '=', profile)
                                     .executeTakeFirst();
-                            } else {
-                                await db.insertInto('account_login')
-                                    .values({
-                                        account_id: account.id,
-                                        profile: profile,
-                                        logged_in: nodeId,
-                                        login_time: toDbDate(new Date())
-                                    })
-                                    .executeTakeFirst();
                             }
-                        } finally {
-                            this.loginRequests.delete(safeName);
-                        }
-                    } else if (type === 'player_logout') {
-                        const { replyTo, username, save } = msg;
-
-                        const raw = Buffer.from(save, 'base64');
-                        if (PlayerLoading.verify(new Packet(raw)) && !(await this.wouldResetSaveFile(raw, profile, username))) {
-                            if (!fs.existsSync(`data/players/${profile}`)) {
-                                await fsp.mkdir(`data/players/${profile}`, { recursive: true });
-                            }
-
-                            await fsp.writeFile(`data/players/${profile}/${username}.sav`, raw);
-                        } else {
-                            console.error(username, 'Invalid save file');
-                        }
-
-                        const account = await db.selectFrom('account')
-                            .leftJoin('account_login', join => join
-                                .onRef('account_id', '=', 'id')
-                                .on('profile', '=', profile)
-                            )
-                            .where('username', '=', username)
-                            .selectAll()
-                            .executeTakeFirst();
-                        
-                        if (account?.account_id) {
-                            await db
-                                .updateTable('account_login')
-                                .set({
-                                    logged_in: 0,
-                                    login_time: null,
-                                    logged_out: nodeId,
-                                    logout_time: toDbDate(new Date())
-                                })
-                                .where('account_id', '=', account.id)
-                                .where('profile', '=', profile)
-                                .executeTakeFirst();
-                        }
-
-                        s.send(
-                            JSON.stringify({
-                                replyTo,
-                                response: 0
-                            })
-                        );
-
-                        await updateHiscores(account, PlayerLoading.load(username, new Packet(raw), null), profile);
-                    } else if (type === 'player_autosave') {
-                        const { username, save } = msg;
-
-                        const raw = Buffer.from(save, 'base64');
-                        if (PlayerLoading.verify(new Packet(raw)) && !(await this.wouldResetSaveFile(raw, profile, username))) {
-                            if (!fs.existsSync(`data/players/${profile}`)) {
-                                await fsp.mkdir(`data/players/${profile}`, { recursive: true });
-                            }
-
-                            await fsp.writeFile(`data/players/${profile}/${username}.sav`, raw);
-                        } else {
-                            console.error(username, 'Invalid save file');
-                        }
-                    } else if (type === 'player_force_logout') {
-                        const { username } = msg;
-
-                        const account = await db
-                            .selectFrom('account')
-                            .leftJoin('account_login', join => join
-                                .onRef('account_id', '=', 'id')
-                                .on('profile', '=', profile)
-                            )
-                            .where('username', '=', username)
-                            .selectAll()
-                            .executeTakeFirst();
-
-                        if (account?.account_id) {
-                            await db
-                                .updateTable('account_login')
-                                .set({
-                                    logged_in: 0,
-                                    login_time: null
-                                })
-                                .where('account_id', '=', account.id)
-                                .where('profile', '=', profile)
-                                .executeTakeFirst();
-                        }
-                        
+                        });
                     } else if (type === 'player_ban') {
                         const { _staff, username, until } = msg;
 

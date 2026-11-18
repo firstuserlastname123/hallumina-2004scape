@@ -1,5 +1,6 @@
 // stdlib
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { Worker } from 'worker_threads';
 
 const tsxWorkerHook = new URL('./worker-bootstrap.mjs', import.meta.url).href;
@@ -108,12 +109,17 @@ import { BotManager } from '#/engine/bot/BotManager.js';
 const priv = forge.pki.privateKeyFromPem(fs.readFileSync('data/config/private.pem', 'ascii'));
 
 type LogoutRequest = {
+    saveId: string;
+    saveSequence: number;
+    sessionId: string;
     save: Uint8Array;
     lastAttempt: number;
     createdAt: number;
 };
 
 class World {
+    private saveSequence = 0;
+    private readonly headlessSaveSessions = new WeakMap<Player, string>();
     private loginThread = new Worker('./src/server/login/LoginThread.ts', { execArgv: ['--import', tsxWorkerHook] });
     private friendThread = new Worker('./src/server/friend/FriendThread.ts', { execArgv: ['--import', tsxWorkerHook] });
     private loggerThread = new Worker('./src/server/logger/LoggerThread.ts', { execArgv: ['--import', tsxWorkerHook] });
@@ -831,7 +837,10 @@ class World {
                 this.loginThread.postMessage({
                     type: 'player_logout',
                     username,
-                    save: request.save
+                    save: request.save,
+                    saveId: request.saveId,
+                    saveSequence: request.saveSequence,
+                    sessionId: request.sessionId
                 });
             }
         }
@@ -844,24 +853,13 @@ class World {
         player: for (const player of this.newPlayers) {
             // prevent logging in if a player save is being flushed
             if (this.logoutRequests.has(player.username)) {
-                const request = this.logoutRequests.get(player.username)!;
-                if (request.createdAt < Date.now() - Environment.NODE_HOP_TIME) {
-                    this.logoutRequests.delete(player.username);
-                } else {
-                    player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - old session is mid-logout');
-
-                    if (isClientConnected(player)) {
-                        player.client.send(Uint8Array.from([5]));
-                        player.client.close();
-                    }
-
-                    this.loginThread.postMessage({
-                        type: 'player_force_logout',
-                        username: player.username
-                    });
-
-                    continue;
+                player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - old session is mid-logout');
+                if (isClientConnected(player)) {
+                    this.releaseLogin(player.username, player.session);
+                    player.client.send(Uint8Array.from([5]));
+                    player.client.close();
                 }
+                continue;
             }
 
             // reconnect a new socket with player in the world
@@ -877,8 +875,10 @@ class World {
                     }
 
                     if (other instanceof NetworkPlayer && player instanceof NetworkPlayer) {
+                        const previousSessionId = other.session;
                         other.client = player.client;
                         other.session = other.client.uuid;
+                        this.admitLogin(other, previousSessionId);
                         other.client.send(Uint8Array.from([15]));
                     }
 
@@ -905,6 +905,7 @@ class World {
 
                 if (player instanceof NetworkPlayer) {
                     player.addSessionLog(LoggerEventType.ENGINE, 'Tried to log in - already logged in');
+                    this.releaseLogin(player.username, player.session);
                     player.client.send(Uint8Array.from([5]));
                     player.client.close();
                 }
@@ -976,6 +977,7 @@ class World {
 
             this.gameMap.getZone(player.x, player.z, player.level).enter(player);
             player.onLogin();
+            if (isClientConnected(player)) this.admitLogin(player);
 
             if (this.shutdownTick != -1) {
                 player.write(new UpdateRebootTimer(this.shutdownTick - this.currentTick));
@@ -1270,7 +1272,10 @@ class World {
             this.loginThread.postMessage({
                 type: 'player_autosave',
                 username: player.username,
-                save: player.save()
+                save: player.save(),
+                saveId: randomUUID(),
+                saveSequence: ++this.saveSequence,
+                sessionId: this.saveSession(player)
             });
         }
     }
@@ -1667,12 +1672,17 @@ class World {
         });
     }
 
+    private admitLogin(player: Player, previousSessionId?: string): void {
+        this.loginThread.postMessage({ type: 'player_admit', username: player.username, sessionId: player.session, previousSessionId });
+    }
+
+    private releaseLogin(username: string, sessionId: string): void {
+        this.loginThread.postMessage({ type: 'player_force_logout', username, sessionId, candidateOnly: true });
+    }
+
     // let the login server know this player can log in elsewhere, do not update save file
     forceLogout(player: Player, response = -1) {
-        this.loginThread.postMessage({
-            type: 'player_force_logout',
-            username: player.username
-        });
+        this.releaseLogin(player.username, player.session);
 
         if (isClientConnected(player)) {
             if (response !== -1) {
@@ -1847,6 +1857,14 @@ class World {
         }
     }
 
+    cancelReboot(): boolean {
+        // Once draining begins, players may already have been removed/saved.
+        if (this.shutdownTick === -1 || this.shutdown) return false;
+        this.shutdownTick = -1;
+        for (const player of this.playerLoop.all()) player.write(new UpdateRebootTimer(0));
+        return true;
+    }
+
     get isPendingShutdown(): boolean {
         return this.shutdownTicksRemaining > -1;
     }
@@ -1877,6 +1895,9 @@ class World {
         if (isPlayerLoginResponse(msg)) {
             const { socket } = msg;
             if (!this.loginRequests.has(socket)) {
+                const admitted = this.getPlayerByUsername(msg.username)?.session === socket;
+                const queued = [...this.newPlayers].some(player => player.username === msg.username && player.session === socket);
+                if (!admitted && !queued && [0, 2, 4].includes(msg.reply)) this.releaseLogin(msg.username, socket);
                 return;
             }
 
@@ -1933,12 +1954,7 @@ class World {
             }
 
             const { username, lowMemory, reconnecting, staffmodlevel, muted_until, members, messageCount } = msg;
-            const pendingLogout = this.logoutRequests.get(username);
-            const pendingLogoutExpired = pendingLogout && pendingLogout.createdAt < Date.now() - Environment.NODE_HOP_TIME;
-            const save = pendingLogoutExpired ? pendingLogout.save : msg.save ?? new Uint8Array();
-            if (pendingLogoutExpired) {
-                this.logoutRequests.delete(username);
-            }
+            const save = msg.save ?? new Uint8Array();
 
             // if (reconnecting && !this.getPlayerByUsername(username)) {
             //     // rejected
@@ -1965,13 +1981,10 @@ class World {
                 player.messageCount = messageCount ?? 0;
 
                 if (this.logoutRequests.has(username)) {
-                    // already logged in (on another world)
+                    // Retain unacknowledged snapshots even after the hop timer.
+                    this.releaseLogin(username, client.uuid);
                     client.send(Uint8Array.from([5]));
                     client.close();
-                    this.loginThread.postMessage({
-                        type: 'player_force_logout',
-                        username: username
-                    });
                     return;
                 }
 
@@ -1980,10 +1993,7 @@ class World {
                     if (player.members) {
                         client.send(Uint8Array.from([17]));
                         client.close();
-                        this.loginThread.postMessage({
-                            type: 'player_force_logout',
-                            username: username
-                        });
+                        this.releaseLogin(username, client.uuid);
                         return;
                     }
                     player.teleport(3221, 3219, 0);
@@ -2001,14 +2011,11 @@ class World {
                 client.close();
 
                 // todo: maybe we can tell the login thread to swap for the last-good save?
-                this.loginThread.postMessage({
-                    type: 'player_force_logout',
-                    username: username
-                });
+                this.releaseLogin(username, client.uuid);
             }
         } else if (isPlayerLogoutResponse(msg)) {
-            const { username, success } = msg;
-            if (!this.logoutRequests.has(username)) {
+            const { username, success, saveId } = msg;
+            if (!saveId || this.logoutRequests.get(username)?.saveId !== saveId) {
                 return;
             }
 
@@ -2404,10 +2411,23 @@ class World {
         });
     }
 
+    private saveSession(player: Player): string {
+        if (player.session !== 'headless') return player.session;
+        let session = this.headlessSaveSessions.get(player);
+        if (!session) {
+            session = randomUUID();
+            this.headlessSaveSessions.set(player, session);
+        }
+        return session;
+    }
+
     flushPlayer(player: Player) {
         const save = player.save();
 
         this.logoutRequests.set(player.username, {
+            saveId: randomUUID(),
+            saveSequence: ++this.saveSequence,
+            sessionId: this.saveSession(player),
             save,
             lastAttempt: -1,
             createdAt: Date.now()

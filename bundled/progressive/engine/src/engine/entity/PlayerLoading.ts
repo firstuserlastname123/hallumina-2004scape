@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { SAV_MAGIC, SAV_VERSION, verifyPlayerSave } from '#/server/login/PlayerSave.js';
 
 import InvType from '#/cache/config/InvType.js';
 import { NetworkPlayer } from '#/engine/entity/NetworkPlayer.js';
@@ -10,22 +11,11 @@ import ClientSocket from '#/server/ClientSocket.js';
 import { fromBase37, toBase37 } from '#/util/JString.js';
 
 export class PlayerLoading {
-    public static readonly SAV_MAGIC: number = 0x2004;
-    public static readonly SAV_VERSION: number = 7;
+    public static readonly SAV_MAGIC = SAV_MAGIC;
+    public static readonly SAV_VERSION = SAV_VERSION;
 
     static verify(sav: Packet) {
-        if (sav.g2() !== PlayerLoading.SAV_MAGIC) {
-            return false;
-        }
-
-        const version = sav.g2();
-        if (version > PlayerLoading.SAV_VERSION) {
-            return false;
-        }
-
-        sav.pos = sav.data.length - 4;
-        const crc = sav.g4s();
-        return crc === Packet.getcrc(sav.data, 0, sav.data.length - 4);
+        return verifyPlayerSave(sav);
     }
 
     static load(name: string, sav: Packet, client: ClientSocket | null) {
