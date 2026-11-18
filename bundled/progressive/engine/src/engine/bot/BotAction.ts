@@ -38,6 +38,8 @@
  *   getCombatLevel
  */
 
+import { journeyTarget, beginTravelLeg, travelActive, onKaramja } from '#/engine/bot/BotTravel.js';
+import { isInside, KARAMJA_POLYGON } from '#/engine/bot/BotRegions.js';
 import { BotLog } from '#/engine/bot/BotLog.js';
 import Player from '#/engine/entity/Player.js';
 import Npc from '#/engine/entity/Npc.js';
@@ -1148,19 +1150,7 @@ const REGIONS: Region[] = [
     // ── Karamja ───────────────────────────────────────────────────────────────
     {
         name: 'Karamja',
-        coords: [
-            [2672, 3205],
-            [2709, 3246],
-            [2807, 3257],
-            [2784, 3325],
-            [2885, 3323],
-            [2882, 3217],
-            [2962, 3176],
-            [2961, 3113],
-            [3024, 3070],
-            [3008, 2857],
-            [2729, 2852],
-            [2727, 3103]]
+        coords: KARAMJA_POLYGON
     },
     {
         name: 'MusaPoint',
@@ -1713,42 +1703,15 @@ function checkRegion(x: number, z: number, level: number, names: string[]): bool
  * Note: A point lying on the boundary (edge or vertex) of the polygon
  * is also considered inside the polygon.
  */
-function isInside(arr: number[][], x: number, z: number): boolean {
-    const n = arr.length;
-    let inside = false;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-        const [x1, z1] = arr[i];
-        const [x2, z2] = arr[j];
-
-        // Point lies on the current edge
-        if (onSegment(x1, z1, x2, z2, x, z)) return true;
-
-        // Check whether the horizontal ray from (x, z)
-        // intersects the current edge
-        const intersect =
-            ((z1 > z) !== (z2 > z)) &&
-            (x < (x2 - x1) * (z - z1) / (z2 - z1) + x1);
-
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-function onSegment(x1: number, z1: number, x2: number, z2: number, x: number, z: number): boolean {
-    const c = (x - x1) * (z2 - z1) - (z - z1) * (x2 - x1);
-    if (c !== 0) return false;
-
-    return Math.min(x1, x2) <= x && x <= Math.max(x1, x2) &&
-        Math.min(z1, z2) <= z && z <= Math.max(z1, z2);
-}
-
 /** rsmod returns compressed turn points in execution order, with the destination last. */
 function _queueBotPath(player: Player, path: Uint32Array): boolean {
     const safe = trimPathAtCsvBlock(player.level, path, player.x, player.z);
     if (safe.length === 0) return false;
     const end = safe[safe.length - 1];
     if (((end >> 14) & 0x3fff) === player.x && (end & 0x3fff) === player.z) return false;
-    player.queueWaypoints(safe);
+    // Engine queues retain the tail when over capacity. Keep the executable
+    // prefix instead, then generate the next segment from the actual endpoint.
+    player.queueWaypoints(safe.slice(0, player.waypoints.length));
     return true;
 }
 
@@ -1855,7 +1818,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
  * moveSpeed is INSTANT, permanently blocking headless player movement.
  */
 export function walkTo(player: Player, destX: number, destZ: number, level = 0): void {
-    if (pollObstacle(player)) return;
+    if (pollObstacle(player) || travelActive(player)) return;
     const bot = (player as any)._bot;
     if (bot) {
         if (bot.activeTask?.interrupted) return;
@@ -1874,7 +1837,13 @@ export function walkTo(player: Player, destX: number, destZ: number, level = 0):
             return;
         }
     }
-    _walkTo(player, destX, destZ, level);
+    const travel = journeyTarget(player, destX, destZ, level);
+    if (travel === false) return;
+    if (travel && beginTravelLeg(player)) return;
+    if (bot?.activeTask?.interrupted) return;
+    if (travel) {
+        _walkTo(player, travel.x, travel.z, travel.level);
+    } else _walkTo(player, destX, destZ, level);
     if (bot && !player.hasWaypoints() && !player.hasInteraction() && !player.delayed &&
         (player.x !== destX || player.z !== destZ || player.level !== level)) {
         bot.navigationFailed('path_failed');
@@ -1963,6 +1932,11 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
         if (dx > 2 * dz || dz > 2 * dx) diagonal = false;
 
         for (const curr of currRegions) {
+            // A transport edge is an optional journey, not a boundary of every
+            // mainland region it can serve. Native transport is planned separately.
+            if (curr.unsupported) continue;
+            if (curr.name === 'BrimhavenFence' &&
+                !(onKaramja(player.x, player.z) && onKaramja(next[0], next[1]))) continue;
             let approach = curr.approach;
             let exit = curr.exit;
             // Approach or exit not properly defined.
@@ -3298,7 +3272,7 @@ export function openGateToward(player: Player, destX: number, destZ: number, rad
     if (dist < 1) return false;
     const gate = _findLoc(player.x, player.z, player.level, Math.min(radius, dist + 2), loc => {
         return gateOp(loc) !== null && !isObstacleSuppressed(player, loc) &&
-            (loc.x - player.x) * dx + (loc.z - player.z) * dz > 0;
+            ((loc.x === player.x && loc.z === player.z) || (loc.x - player.x) * dx + (loc.z - player.z) * dz > 0);
     });
     return gate ? _interactObstacle(player, gate, gateOp(gate)!) : false;
 }

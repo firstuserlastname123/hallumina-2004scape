@@ -490,6 +490,7 @@ export class StuckDetector {
 export class ProgressWatchdog {
     private readonly limit: number;
     private stallTicks = 0;
+    private travelSerial = -1;
 
     /**
      * Activity destination retained for callers' diagnostics. A stall never
@@ -519,6 +520,11 @@ export class ProgressWatchdog {
      */
     check(player: Player, paused = false): boolean {
         if (paused) return false;
+        const serial = (player as any)._bot?.navigation.meaningfulTravelSerial;
+        if (serial !== undefined && serial !== this.travelSerial) {
+            if (this.travelSerial !== -1) this.stallTicks = 0;
+            this.travelSerial = serial;
+        }
         if (++this.stallTicks < this.limit) return false;
         (player as any)._bot?.deferCurrentTask('activity watchdog: no progress');
         this.reset();

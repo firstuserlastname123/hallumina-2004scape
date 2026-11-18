@@ -31,6 +31,7 @@ Math.random = () => {
 };
 const { default: World } = await import('#/engine/World.js');
 const { BotManager } = await import('#/engine/bot/BotManager.js');
+const { BotRouteRetry } = await import('#/engine/bot/BotRouteRetry.js');
 const { BotPlayer } = await import('#/engine/bot/BotPlayer.js');
 const { db } = await import('#/db/query.js');
 const { PlayerLoading } = await import('#/engine/entity/PlayerLoading.js');
@@ -49,6 +50,29 @@ const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMe
     routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
 // Same observers are copied to both implementations. Script starts include the
 // baseline's direct gate execution as well as normal engine-dispatched scripts.
+let nativeScriptDepth = 0;
+const participation = { idleBotTicks: 0, travelBotTicks: 0, supportBotTicks: 0, activityBotTicks: 0,
+    progressionActivityBotTicks: 0, agilityTaskBotTicks: 0, nativeXpBotTicks: 0, requestedTileArrivals: 0, faresPaid: 0 };
+const transportLegs: Record<string, { started: number; arrived: number; coins: number }> = {};
+const nativeXp = new Map<string, number>();
+const xpThisTick = new Set<string>();
+const targets = new WeakMap<object, {x:number;z:number;level:number;distance:number}>();
+function observeArrival(retry: object, x:number,z:number,level:number) {
+    const previous=targets.get(retry);
+    if(previous && previous.distance>0 && previous.x===x && previous.z===z && previous.level===level) {
+        participation.requestedTileArrivals++; previous.distance=0;
+    }
+}
+const retryRequest=BotRouteRetry.prototype.request;
+BotRouteRetry.prototype.request=function(...args) {
+    observeArrival(this,args[0],args[1],args[2]);
+    targets.set(this,{x:args[3],z:args[4],level:args[5],distance:args[2]===args[5]?Math.max(Math.abs(args[0]-args[3]),Math.abs(args[1]-args[4])):Infinity});
+    return retryRequest.apply(this,args);
+};
+const retryObserve=BotRouteRetry.prototype.observe;
+BotRouteRetry.prototype.observe=function(...args){observeArrival(this,args[0],args[1],args[2]);return retryObserve.apply(this,args);};
+const retryReset=BotRouteRetry.prototype.reset;
+BotRouteRetry.prototype.reset=function(){targets.delete(this);return retryReset.call(this);};
 const obstacles = { gateClicks: 0, gateScripts: 0, gateOpened: 0, gateUnverified: 0,
     transitionClicks: 0, transitionScripts: 0, transitionCompleted: 0, transitionUnverified: 0 };
 const completions: Record<string, number> = {};
@@ -102,7 +126,8 @@ Player.prototype.executeScript = function (...args) {
                 level: this.level, x: this.x, z: this.z, tick: World.currentTick, gate: kind === 'gate' });
         }
     }
-    return executeScript.apply(this, args);
+    nativeScriptDepth++;
+    try { return executeScript.apply(this, args); } finally { nativeScriptDepth--; }
 };
 const completeTask = (BotPlayer.prototype as any)._recordComplete;
 (BotPlayer.prototype as any)._recordComplete = function (...args: any[]) {
@@ -125,6 +150,17 @@ for (const name of ['CombatTask', 'RangedMagicTask', 'RunecraftingTask', 'Thievi
     };
 }
 if (logModule) {
+    const event=logModule.BotLog.event.bind(logModule.BotLog);
+    logModule.BotLog.event=(...args) => {
+        if (/^transport_(started|arrived|fare)$/.test(args[2])) {
+            const leg=args[3].split(':')[0];
+            const record=transportLegs[leg] ??= {started:0,arrived:0,coins:0};
+            if(args[2]==='transport_started') record.started++;
+            if(args[2]==='transport_arrived') record.arrived++;
+            if(args[2]==='transport_fare') {const fare=Number(args[3].match(/: (\d+) coins/)?.[1]??0);record.coins+=fare;participation.faresPaid+=fare;}
+        }
+        event(...args);
+    };
     const debug = logModule.BotLog.debug.bind(logModule.BotLog);
     logModule.BotLog.debug = (...values: unknown[]) => {
         if (!insideTaskLog && values.some(value => typeof value === 'string' && /timeout/i.test(value))) counters.timeoutDiagnostics++;
@@ -174,6 +210,7 @@ Player.prototype.addXp = function (stat, xp, allowMulti = true) {
     const beforeLevel = this.baseLevels[stat];
     originalXp.call(this, stat, xp, allowMulti);
     if (this.is_bot && World.currentTick >= 20) {
+        if(nativeScriptDepth>0) {nativeXp.set(this.username,(nativeXp.get(this.username)??0)+Math.max(0,this.stats[stat]-before)/10);xpThisTick.add(this.username);}
         actionXp.set(this.username, (actionXp.get(this.username) ?? 0) + Math.max(0, this.stats[stat] - before) / 10);
         actionLevels.set(this.username, (actionLevels.get(this.username) ?? 0) + Math.max(0, this.baseLevels[stat] - beforeLevel));
     }
@@ -209,7 +246,16 @@ BotManager.tick = () => {
     for (const bot of population()) {
         if (!tasksSeen.has(bot.name)) tasksSeen.set(bot.name, new Set());
         if (bot.currentTask) tasksSeen.get(bot.name)!.add(bot.currentTask.name);
+        const name=bot.activeTask?.name??'Idle';
+        const state=String((bot.activeTask as any)?.state??'');
+        if(name==='Idle') participation.idleBotTicks++;
+        else if(bot.player.hasWaypoints() || /walk|travel/.test(state)) participation.travelBotTicks++;
+        else if(/^(Init|ShopTrip|Bank|Walk)$/.test(name)) participation.supportBotTicks++;
+        else {participation.activityBotTicks++;if(!bot.planner.personality.name.startsWith('Extras'))participation.progressionActivityBotTicks++;}
+        if(name==='Agility')participation.agilityTaskBotTicks++;
+        if(xpThisTick.has(bot.name))participation.nativeXpBotTicks++;
     }
+    xpThisTick.clear();
 };
 function population() {
     return [...manager.bots.values()] as InstanceType<typeof BotPlayer>[];
@@ -221,7 +267,7 @@ function progression() {
             name: bot.name, personality: bot.planner.personality.name, task: bot.currentTask?.name,
             tasksSeen: [...tasksSeen.get(bot.name) ?? []],
             x: p.x, z: p.z, level: p.level, xp: Array.from(p.stats), levels: Array.from(p.baseLevels),
-            xpGained: actionXp.get(bot.name) ?? 0,
+            nativeScriptXpGained: nativeXp.get(bot.name) ?? 0, xpGained: actionXp.get(bot.name) ?? 0,
             levelsGained: actionLevels.get(bot.name) ?? 0
         };
     });
@@ -294,8 +340,8 @@ const report = { seed, ticks, simulatedMinutes: ticks * 0.6 / 60, intervalMs: in
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },
-    active, counters, obstacles, taskCompletions: completions, productionFingerprints: Object.fromEntries([
-        'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
+    active, counters, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
+        'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
     ].map(file => [file, fs.existsSync(`src/engine/bot/${file}`) ? createHash('sha256').update(fs.readFileSync(`src/engine/bot/${file}`)).digest('hex') : null])), eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
     steadyWorldTiming: timing(worldTimes.slice(20)), steadyBotTiming: timing(botTimes.slice(20)),
     xpGained: bots.reduce((sum, b) => sum + b.xpGained, 0), levelsGained: bots.reduce((sum, b) => sum + b.levelsGained, 0),

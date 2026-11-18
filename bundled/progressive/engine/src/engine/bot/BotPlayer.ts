@@ -5,6 +5,9 @@
  */
 
 import fs from 'fs';
+import { attachBotDialogue, answerBotDialogue } from '#/engine/bot/BotDialogue.js';
+import { tickTravel } from '#/engine/bot/BotTravel.js';
+import { pendingGnomeGate } from '#/engine/bot/BotObstacles.js';
 import path from 'path';
 import Player from '#/engine/entity/Player.js';
 import InvType from '#/cache/config/InvType.js';
@@ -101,6 +104,7 @@ export class BotPlayer {
 
         // link player → bot (so tasks/BotAction can access this)
         (player as any)._bot = this;
+        attachBotDialogue(player);
 
         BotDebugService.registerBot(this);
     }
@@ -291,6 +295,9 @@ export class BotPlayer {
             return; // let the task pick up normally next tick
         }
 
+        if (tickTravel(this.player)) return;
+        if (pendingGnomeGate(this.player) && answerBotDialogue(this.player, /^OK then\.$/i)) return;
+
         // Auto-respond to p_countdialog: bots have no client to send resume_p_countdialog,
         // so the script hangs forever. Reply with 99 so the full inventory is processed.
         if (this.player.activeScript?.execution === ScriptState.COUNTDIALOG) {
@@ -335,7 +342,7 @@ export class BotPlayer {
 
         // ── RESCAN ───────────────────────────────────────────────
         this.rescanTimer++;
-        if (this.rescanTimer >= RESCAN_TICKS) {
+        if (this.rescanTimer >= RESCAN_TICKS && !this.navigation.hasRecentTravel(this.ticksAlive)) {
             this.rescanTimer = 0;
 
             if (this.currentTask && !NO_INTERRUPT_TASKS.has(this.currentTask.name)) {

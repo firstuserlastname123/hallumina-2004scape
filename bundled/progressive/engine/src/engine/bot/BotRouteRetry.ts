@@ -11,6 +11,8 @@ export class BotRouteRetry {
     private retryAt = 0;
     private progressTick = 0;
     failures = 0;
+    meaningfulTravelSerial = 0;
+    private meaningfulTravelTick = -Infinity;
 
     request(x: number, z: number, level: number, destX: number, destZ: number, destLevel: number, tick = 0): boolean {
         // Credit travel toward the previous goal before moving the anchor. A target
@@ -45,6 +47,8 @@ export class BotRouteRetry {
             // deadline. Choosing a new waypoint never replenishes retries.
             if (distance < via.best - 2 || (distance === 0 && via.best > 0)) {
                 via.best = distance;
+                this.meaningfulTravelSerial++;
+                this.meaningfulTravelTick = tick;
                 this.progressTick = tick;
             }
         }
@@ -54,6 +58,8 @@ export class BotRouteRetry {
         const arrived = this.requested && this.requested.distance > 0 && this.requested.level === level &&
             this.requested.x === x && this.requested.z === z;
         if (distance < this.bestDistance - 2 || (distance === 0 && this.bestDistance > 0) || arrived) {
+            this.meaningfulTravelSerial++;
+            this.meaningfulTravelTick = tick;
             this.bestDistance = Math.min(this.bestDistance, distance);
             if (arrived) this.requested!.distance = 0;
             this.failures = 0;
@@ -76,6 +82,10 @@ export class BotRouteRetry {
         return this.target?.level === level ? Math.max(Math.abs(x - this.target.x), Math.abs(z - this.target.z)) : Infinity;
     }
 
+    hasRecentTravel(tick: number): boolean {
+        return !!this.target && !!this.requested && this.requested.distance > 0 && tick - this.meaningfulTravelTick < 100;
+    }
+
     canAttempt(tick: number): boolean { return tick >= this.retryAt; }
     isStalled(tick: number): boolean { return tick - this.progressTick >= 100; }
     get destinationLabel(): string { return this.destination || 'interaction target'; }
@@ -88,6 +98,7 @@ export class BotRouteRetry {
     }
 
     reset(): void {
+        this.meaningfulTravelTick = -Infinity;
         this.destination = '';
         this.target = null;
         this.requested = null;

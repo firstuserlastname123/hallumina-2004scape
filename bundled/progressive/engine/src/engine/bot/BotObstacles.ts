@@ -1,3 +1,4 @@
+import LocType from '#/cache/config/LocType.js';
 import Player from '#/engine/entity/Player.js';
 import Loc from '#/engine/entity/Loc.js';
 import { Interaction } from '#/engine/entity/Interaction.js';
@@ -31,6 +32,10 @@ function remember(s: State, id: string): void {
 export function isObstacleSuppressed(player: Player, loc: Loc): boolean {
     return (states.get(player)?.failed.get(key(loc)) ?? 0) > World.currentTick;
 }
+export function pendingGnomeGate(player: Player): boolean {
+    const loc = states.get(player)?.pending?.loc;
+    return !!loc && LocType.get(loc.type).debugname === 'gnome_areagate';
+}
 export function hasPendingObstacle(player: Player): boolean { return !!states.get(player)?.pending; }
 
 /** Return true while a real click is unresolved, or on its failure tick. */
@@ -49,8 +54,11 @@ export function pollObstacle(player: Player): boolean {
     const dz = [0, 1, 0, -1][a.angle];
     const crossed = dx ? Math.sign(player.x - a.loc.x - dx / 2) !== Math.sign(a.sourceX - a.loc.x - dx / 2) :
         Math.sign(player.z - a.loc.z - dz / 2) !== Math.sign(a.sourceZ - a.loc.z - dz / 2);
+    const rectangleCrossed = a.shape >= 9 && Math.max(Math.abs(player.x-a.sourceX),Math.abs(player.z-a.sourceZ)) >= 2 &&
+        (a.loc.width >= a.loc.length ? Math.sign(player.z-a.loc.z-(a.loc.length-1)/2) !== Math.sign(a.sourceZ-a.loc.z-(a.loc.length-1)/2) :
+            Math.sign(player.x-a.loc.x-(a.loc.width-1)/2) !== Math.sign(a.sourceX-a.loc.x-(a.loc.width-1)/2));
     const complete = a.crossing ? player.level === a.crossing.level && (player.z > 4100) === a.crossing.underground :
-        changed && (crossed || canBotStep(a.loc.level, a.loc.x, a.loc.z, a.loc.x + dx, a.loc.z + dz));
+        changed && (crossed || rectangleCrossed || canBotStep(a.loc.level, a.loc.x, a.loc.z, a.loc.x + dx, a.loc.z + dz));
     if (complete) {
         s.pending = undefined;
         BotLog.event('debug', player.username, a.crossing ? 'transition_completed' : 'gate_opened', `Obstacle passed at (${a.loc.x},${a.loc.z},${a.loc.level})`);
