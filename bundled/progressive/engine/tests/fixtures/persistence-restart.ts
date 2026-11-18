@@ -39,13 +39,25 @@ const bots = [...World.playerLoop.all()].filter(p => p.is_bot);
 assert.ok(bots.length > 0);
 const bot = bots.find(p => p.username === 'sk1')!;
 assert.ok(bot);
+const fishing = VarPlayerType.getId('fishingcompo');
+const grandtree = VarPlayerType.getId('grandtree');
+const femi = VarPlayerType.getId('femi_help');
+const barcrawl = VarPlayerType.getId('barcrawl');
+if (!restoring) {
+    for (const p of bots) {
+        assert.equal(p.getVar(fishing), 0, 'fresh bots must not receive Fishing Contest completion');
+        assert.equal(p.getVar(grandtree), 0, 'fresh bots must not receive Grand Tree completion');
+        assert.equal(p.getVar(femi), 0, 'fresh bots must use the native Gnome gate interaction');
+        assert.equal(p.getVar(barcrawl), 0, 'fresh bots must not receive Barcrawl completion');
+    }
+}
 const varp = VarPlayerType.getId('option_music');
 assert.ok(varp >= 0 && VarPlayerType.get(varp).scope === VarPlayerType.SCOPE_PERM);
 const coins = ObjType.getId('coins');
 assert.ok(coins >= 0);
 function state(p: typeof human) {
     return { xp: p.stats[PlayerStat.WOODCUTTING], level: p.baseLevels[PlayerStat.WOODCUTTING], playtime: p.playtime,
-        coins: p.invTotal(InvType.INV, coins), bank: p.invTotal(InvType.getId('bank'), coins), varp: p.getVar(varp), x: p.x, z: p.z, plane: p.level };
+        coins: p.invTotal(InvType.INV, coins), bank: p.invTotal(InvType.getId('bank'), coins), varp: p.getVar(varp), fishing: p.getVar(fishing), grandtree: p.getVar(grandtree), femi: p.getVar(femi), barcrawl: p.getVar(barcrawl), x: p.x, z: p.z, plane: p.level };
 }
 if (restoring) {
     const expected = JSON.parse(fs.readFileSync('expected.json', 'utf8'));
@@ -68,6 +80,8 @@ for (const p of [human, bot]) {
     p.invAdd(InvType.INV, coins, 321, false);
     p.invAdd(InvType.getId('bank'), coins, 654, false);
     p.setVar(varp, 1);
+    // Represent a completed quest and partial progress from an existing save.
+    p.setVar(fishing, 5); p.setVar(grandtree, 7);
     p.playtime = 5678;
     p.x = 3222; p.z = 3218; p.level = 0;
 }

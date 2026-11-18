@@ -20,9 +20,9 @@ import {
     walkTo, interactLocOp, findLocByName,
     findLocByNameWhere,
     isNear, getBaseLevel, getProgressionStep,
-    PlayerStat, Locations, randInt,
+    PlayerStat, randInt,
     StuckDetector, ProgressWatchdog,
-    teleportNear, openNearbyGate,
+    openNearbyGate,
 } from '#/engine/bot/tasks/BotTaskBase.js';
 import type { SkillStep } from '#/engine/bot/tasks/BotTaskBase.js';
 import { AgilityCourses } from '#/engine/bot/BotKnowledge.js';
@@ -45,7 +45,6 @@ export class AgilityTask extends BotTask {
     private lastLevel     = 0;
     private complete      = false;
     private lapsCompleted = 0;
-    private courseTeleportDone = false;
     private static readonly LAPS_PER_TASK = 10;
 
     /** Ticks to wait for movement before assuming the obstacle failed. */
@@ -81,6 +80,8 @@ export class AgilityTask extends BotTask {
 
     tick(player: Player): void {
         if (this.interrupted) return;
+        const bot = (player as any)._bot;
+        if (bot && !bot.navigation.canAttempt(bot.ticksAliveValue)) return;
 
         // Watchdog resets the state to walk if the bot goes idle too long
         if (this.watchdog.check(player, false)) {
@@ -106,9 +107,20 @@ export class AgilityTask extends BotTask {
             this.step          = newStep;
             this.obstacleIndex = 0;
             this.state         = 'walk';
-            this.courseTeleportDone = false;
             this.stuck.reset();
             this.watchdog.reset();
+        }
+
+        const course = (this.step.extra?.course as string | undefined) ?? 'GNOME';
+        if (course === 'GNOME' && (this.state === 'walk' || this.state === 'obstacle')) {
+            const floors = [0, 0, 1, 2, 2, 0, 0];
+            if (floors[this.obstacleIndex] !== player.level) {
+                if (player.level === 1) this.obstacleIndex = 2;
+                else if (player.level === 2) this.obstacleIndex = player.x < 2483 ? 3 : 4;
+                else if (player.level === 0) this.obstacleIndex = 0;
+                else { this._navigationFailed(player, 'unsupported course floor'); return; }
+                this.state = 'obstacle';
+            }
         }
 
         // ── Walk to course start ─────────────────────────────────────────────
@@ -116,7 +128,7 @@ export class AgilityTask extends BotTask {
             const [lx, lz, ll] = this.step.location;
             if (this._isBarbarianCourse() && this._needsBarbarianEntryPipe(player)) {
                 if (!isNear(player, AgilityTask.BARBARIAN_ENTRY_PIPE_X, AgilityTask.BARBARIAN_ENTRY_STAND_Z, 1, 0)) {
-                    teleportNear(player, AgilityTask.BARBARIAN_ENTRY_PIPE_X, AgilityTask.BARBARIAN_ENTRY_STAND_Z, 0);
+                    walkTo(player, AgilityTask.BARBARIAN_ENTRY_PIPE_X, AgilityTask.BARBARIAN_ENTRY_STAND_Z, 0);
                     this.cooldown = 3;
                     return;
                 }
@@ -125,23 +137,11 @@ export class AgilityTask extends BotTask {
             }
 
             if (!isNear(player, lx, lz, 15, ll)) {
-                if (this._shouldTeleportToCourse(player)) {
-                    if (this._isBarbarianCourse()) {
-                        teleportNear(player, AgilityTask.BARBARIAN_ENTRY_PIPE_X, AgilityTask.BARBARIAN_ENTRY_STAND_Z, 0);
-                        this.state = 'entry_pipe';
-                    } else {
-                        teleportNear(player, lx, lz, ll);
-                    }
-                    this.courseTeleportDone = true;
-                    this.cooldown = 3;
-                    return;
-                }
-
                 this._stuckWalk(player, lx, lz);
                 return;
             }
 
-            BotLog.debug(`[Agility] 🏃 Arrived at course`);
+            BotLog.debug('[Agility] 🏃 Arrived at course');
             this.obstacleIndex = 0;
             this.state         = this._needsBarbarianEntryPipe(player) ? 'entry_pipe' : 'obstacle';
             return;
@@ -150,13 +150,12 @@ export class AgilityTask extends BotTask {
         if (this.state === 'entry_pipe') {
             const loc = this._findBarbarianEntryPipe(player, 20);
             if (!loc) {
-                teleportNear(player, AgilityTask.BARBARIAN_ENTRY_PIPE_X, AgilityTask.BARBARIAN_ENTRY_STAND_Z, 0);
-                this.cooldown = 2;
+                this._navigationFailed(player, 'entry pipe unavailable');
                 return;
             }
 
             if (!isNear(player, loc.x, loc.z, 3, loc.level)) {
-                teleportNear(player, loc.x, loc.z + 2, loc.level);
+                walkTo(player, loc.x, loc.z + 2, loc.level);
                 this.cooldown = 2;
                 return;
             }
@@ -186,26 +185,16 @@ export class AgilityTask extends BotTask {
             if (this.obstacleIndex >= obstacles.length) {
                 // Completed a full lap — restart from the first obstacle
                 this.obstacleIndex = 0;
-                BotLog.debug(`[Agility] 🏁 Lap complete, restarting`);
+                BotLog.debug('[Agility] 🏁 Lap complete, restarting');
             }
 
             const obstacle = obstacles[this.obstacleIndex];
 
-            // Search in a generous radius — obstacle locs can be spread out.
-            // Also try adjacent levels: some course transitions (e.g. net → level 1,
-            // then tree branch at level 0) leave the player on a different level than
-            // the next obstacle loc.
-            let loc = this._findObstacleLoc(player, obstacle.name, 25);
-            if (!loc) {
-                const altLevel = player.level === 0 ? 1 : 0;
-                loc = this._findObstacleLoc(player, obstacle.name, 25, altLevel);
-            }
+            // A loc on another floor cannot be clicked or approached by walking.
+            const loc = this._findObstacleLoc(player, obstacle.name, 25);
 
             if (!loc) {
-                // Obstacle not visible yet — wander toward the course centre and retry
-                const [lx, lz] = this.step.location;
-                walkTo(player, lx + randInt(-4, 4), lz + randInt(-4, 4));
-                this.cooldown = 2;
+                this._navigationFailed(player, `obstacle ${obstacle.name} unavailable on floor ${player.level}`);
                 return;
             }
 
@@ -215,7 +204,7 @@ export class AgilityTask extends BotTask {
             const targetZ = loc.z + (obstacle.approachDz ?? 0);
             const approachDistance = obstacle.approachDx !== undefined || obstacle.approachDz !== undefined ? 0 : 1;
             if (!isNear(player, targetX, targetZ, approachDistance, loc.level)) {
-                walkTo(player, targetX, targetZ);
+                walkTo(player, targetX, targetZ, loc.level);
                 return;
             }
 
@@ -286,7 +275,7 @@ export class AgilityTask extends BotTask {
                     }
                     this.obstacleIndex = 0;
                     if (this._isBarbarianCourse()) {
-                        teleportNear(player, AgilityTask.BARBARIAN_ROPE_START_X, AgilityTask.BARBARIAN_ROPE_START_Z, 0);
+                        walkTo(player, AgilityTask.BARBARIAN_ROPE_START_X, AgilityTask.BARBARIAN_ROPE_START_Z, 0);
                         this.state = 'obstacle';
                         this.cooldown = 3;
                         return;
@@ -300,7 +289,8 @@ export class AgilityTask extends BotTask {
 
             if (this.waitTicks >= AgilityTask.MAX_WAIT) {
                 // Timed out — obstacle likely failed; reset and re-navigate to course
-                BotLog.debug(`[Agility] ⚠️ Obstacle timeout — resetting lap`);
+                BotLog.debug('[Agility] ⚠️ Obstacle timeout — resetting lap');
+                this._navigationFailed(player, 'obstacle did not complete');
                 this.obstacleIndex = 0;
                 this.waitTicks     = 0;
                 this.state         = 'walk';
@@ -325,7 +315,6 @@ export class AgilityTask extends BotTask {
         this.watchdog.reset();
         this.complete      = false;
         this.lapsCompleted = 0;
-        this.courseTeleportDone = false;
     }
 
     // ── Stuck-walk helper ────────────────────────────────────────────────────
@@ -337,8 +326,8 @@ export class AgilityTask extends BotTask {
         }
 
         if (this.stuck.desperatelyStuck) {
-            BotLog.debug(`[Agility] 🌀 Teleport escape`);
-            teleportNear(player, x, z);
+            (player as any)._bot?.deferCurrentTask('agility destination inaccessible');
+            this.interrupt();
             this.stuck.reset();
             return;
         }
@@ -364,11 +353,10 @@ export class AgilityTask extends BotTask {
         return this._isBarbarianCourse() && player.level === 0 && player.z > 3558;
     }
 
-    private _shouldTeleportToCourse(player: Player): boolean {
-        if (this.courseTeleportDone || !this._isBarbarianCourse()) return false;
-
-        const [lx, lz, ll] = this.step.location;
-        return player.level !== ll || Math.abs(player.x - lx) + Math.abs(player.z - lz) > 40;
+    private _navigationFailed(player: Player, reason: string): void {
+        BotLog.debug(`[Agility] ${reason}`);
+        (player as any)._bot?.navigationFailed('agility_unreachable');
+        this.cooldown = AgilityTask.MAX_WAIT;
     }
 
     private _isBarbarianCourse(): boolean {

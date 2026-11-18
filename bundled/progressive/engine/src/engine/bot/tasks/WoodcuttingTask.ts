@@ -16,16 +16,17 @@
  */
 
 import { BotLog } from '#/engine/bot/BotLog.js';
+import { findLocApproach } from '#/engine/bot/BotNavigation.js';
 import LocType from '#/cache/config/LocType.js';
 import {
     BotTask, Player, Loc, InvType,
     walkTo, interactLoc,
-    findLocByPrefix, findLocByPrefixWhere, findNpcByName,
+    findLocByPrefixWhere,
     claimLoc, releaseLoc, isLocClaimed,
     hasItem, addItem, isInventoryFull, isNear,
     getBaseLevel, PlayerStat,
     Items, Locations, getProgressionStep,
-    teleportToSafety, teleportNear, randInt, bankInvId, INTERACT_TIMEOUT, StuckDetector, ProgressWatchdog,
+    randInt, bankInvId, INTERACT_TIMEOUT, StuckDetector, ProgressWatchdog,
     isAdjacentToLoc, openNearbyGate, botJitter, advanceBankWalk, hasStrayItems,
 } from '#/engine/bot/tasks/BotTaskBase.js';
 import type { SkillStep } from '#/engine/bot/tasks/BotTaskBase.js';
@@ -55,6 +56,7 @@ export class WoodcuttingTask extends BotTask {
     private approachTicks  = 0;   // ticks spent approaching a tree
     private fleeTicks      = 0;
     private readonly FLEE_TICKS = 12;
+    private readonly unavailableTrees = new Map<Loc, number>();
     private currentTree:  Loc | null = null;
     private readonly stuck    = new StuckDetector(30, 4, 2);
     private readonly watchdog = new ProgressWatchdog();
@@ -94,6 +96,8 @@ export class WoodcuttingTask extends BotTask {
 
     tick(player: Player): void {
         if (this.interrupted) return;
+        const bot = (player as any)._bot;
+        if (bot && !bot.navigation.canAttempt(bot.ticksAliveValue)) return;
         const banking = this.state === 'bank_walk' || this.state === 'bank_done';
         if (this.watchdog.check(player, banking)) {
             player.clearWaypoints();
@@ -241,12 +245,20 @@ export class WoodcuttingTask extends BotTask {
                 this.approachTicks = 0;
             } else {
                 // Walk to the tile directly adjacent to the tree's nearest face
-                const [tx, tz] = this._approachTile(player, tree);
-                walkTo(player, tx, tz);
+                const tile = this._approachTile(player, tree);
+                if (!tile) {
+                    this._excludeTree(player, tree);
+                    this._releaseTree();
+                    this.approachTicks = 0;
+                    (player as any)._bot?.navigationFailed('resource_unreachable');
+                    return;
+                }
+                walkTo(player, tile[0], tile[1], tree.level);
                 this.approachTicks++;
                 if (this.approachTicks > 30) {
                     // Can't reach this tree — try another
                     BotLog.debug(`[WC:${player.username}] Can't reach tree at (${tree.x},${tree.z}), retrying`);
+                    this._excludeTree(player, tree);
                     this._releaseTree();
                     this.approachTicks = 0;
                     const [lx, lz] = this.step.location;
@@ -330,9 +342,15 @@ export class WoodcuttingTask extends BotTask {
         // for bots standing in roughly the same spot). But if every tree in
         // range is already claimed, fall back to the closest one regardless —
         // better to share a tree than to sit scanning forever finding nothing.
-        const unclaimed = findLocByPrefixWhere(player.x, player.z, player.level, this._treePrefix(), 15, loc => !isLocClaimed(loc), 'stump');
+        const unclaimed = findLocByPrefixWhere(player.x, player.z, player.level, this._treePrefix(), 15, loc => !isLocClaimed(loc) && (this.unavailableTrees.get(loc) ?? 0) <= player.playtime, 'stump');
         if (unclaimed) return unclaimed;
-        return findLocByPrefix(player.x, player.z, player.level, this._treePrefix(), 15, 'stump');
+        return findLocByPrefixWhere(player.x, player.z, player.level, this._treePrefix(), 15, loc => (this.unavailableTrees.get(loc) ?? 0) <= player.playtime, 'stump');
+    }
+
+    private _excludeTree(player: Player, tree: Loc): void {
+        for (const [loc, until] of this.unavailableTrees) if (until <= player.playtime) this.unavailableTrees.delete(loc);
+        if (this.unavailableTrees.size >= 64) this.unavailableTrees.delete(this.unavailableTrees.keys().next().value!);
+        this.unavailableTrees.set(tree, player.playtime + 200);
     }
 
     /** Release the currently claimed tree (if any) so other bots can target it. */
@@ -361,29 +379,11 @@ export class WoodcuttingTask extends BotTask {
         }
     }
 
-    /**
-     * Returns the tile the bot should walk to in order to be adjacent to the tree.
-     * Picks the nearest face of the loc's bounding box, offset by 1 tile outward.
-     */
-    private _approachTile(player: Player, tree: Loc): [number, number] {
-        // Tree occupies [tree.x .. tree.x+width-1] x [tree.z .. tree.z+length-1]
-        const w = 2; const l = 2; // normal trees are always 2x2
-
-        // Find closest point on the bounding box to the player
-        const closestX = Math.max(tree.x, Math.min(player.x, tree.x + w - 1));
-        const closestZ = Math.max(tree.z, Math.min(player.z, tree.z + l - 1));
-
-        // Step 1 tile away from that point toward the player
-        const dx = player.x - closestX;
-        const dz = player.z - closestZ;
-
-        if (Math.abs(dx) >= Math.abs(dz)) {
-            return [closestX + Math.sign(dx), closestZ];
-        } else {
-            return [closestX, closestZ + Math.sign(dz)];
-        }
+    /** Use the engine's dimensions, rotation, collision and operating rules. */
+    private _approachTile(player: Player, tree: Loc): [number, number] | null {
+        const tile = findLocApproach(player, tree);
+        return tile ? [tile.x, tile.z] : null;
     }
-
 
     // ── Step re-roll ─────────────────────────────────────────────────────────
 
@@ -405,7 +405,7 @@ export class WoodcuttingTask extends BotTask {
         }
     }
 
-        private _depositLoot(player: Player): void {
+    private _depositLoot(player: Player): void {
         const inv = player.getInventory(InvType.INV);
         const bid = bankInvId();
         if (!inv || bid === -1) return;
@@ -443,7 +443,8 @@ export class WoodcuttingTask extends BotTask {
             return;
         }
         if (this.stuck.desperatelyStuck) {
-            teleportNear(player, lx, lz);
+            (player as any)._bot?.deferCurrentTask('woodcutting destination inaccessible');
+            this.interrupt();
             this.stuck.reset();
             return;
         }

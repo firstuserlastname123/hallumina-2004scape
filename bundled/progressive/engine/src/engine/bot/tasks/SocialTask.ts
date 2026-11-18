@@ -74,11 +74,11 @@ const SCAN_AREAS: ScanArea[] = [
     },
     {
         // Varrock East Bank — road south of the building
-        x: 3253, z: 3417,
-        spawnX: 3253, spawnZ: 3415,
+        x: 3253, z: 3412,
+        spawnX: 3253, spawnZ: 3412,
         wanderPoints: [
-            [3253, 3415], [3259, 3417], [3246, 3416],
-            [3255, 3411], [3262, 3413], [3248, 3412], [3257, 3419],
+            [3253, 3412], [3260, 3417], [3246, 3416],
+            [3255, 3411], [3262, 3413], [3248, 3412], [3261, 3419],
         ],
     },
     {
@@ -355,7 +355,7 @@ export class SocialTask extends BotTask {
 
         if (player.level !== 0 && this.state !== 'wilderness_trap') {
             const area = SCAN_AREAS[this.areaIndex]!;
-            teleportNear(player, area.spawnX, area.spawnZ);
+            walkTo(player, area.spawnX, area.spawnZ, 0);
             this._resetTarget();
             this.cooldown = 3;
             return;
@@ -715,7 +715,7 @@ export class SocialTask extends BotTask {
         }
     }
 
-    private handleMoveArea(player: Player): void {
+    private handleMoveArea(_player: Player): void {
         const next = (this.areaIndex + 1 + Math.floor(Math.random() * (SCAN_AREAS.length - 1))) % SCAN_AREAS.length;
         this.areaIndex       = next;
         this.areaInitialized = false;
@@ -737,7 +737,7 @@ export class SocialTask extends BotTask {
     // escalating — we don't want to teleport mid-tour, just recover naturally.
     private _leadStuckWalk(player: Player, tx: number, tz: number): void {
         if (!this.leadStuck.check(player, tx, tz)) { walkTo(player, tx, tz); return; }
-        if (this.leadStuck.desperatelyStuck) { teleportNear(player, tx, tz); this.leadStuck.reset(); return; }
+        if (this.leadStuck.desperatelyStuck) { (player as any)._bot?.deferCurrentTask('social tour destination inaccessible'); this.interrupt(); return; }
         walkTo(player, player.x + randInt(-5, 5), player.z + randInt(-5, 5));
     }
 
@@ -775,7 +775,7 @@ export class SocialTask extends BotTask {
 
     private _stuckWalk(player: Player, tx: number, tz: number): void {
         if (!this.stuck.check(player, tx, tz)) { walkTo(player, tx, tz); return; }
-        if (this.stuck.desperatelyStuck) { teleportNear(player, tx, tz); this.stuck.reset(); return; }
+        if (this.stuck.desperatelyStuck) { (player as any)._bot?.deferCurrentTask('social destination inaccessible'); this.interrupt(); return; }
         walkTo(player, player.x + randInt(-6, 6), player.z + randInt(-6, 6));
     }
 }

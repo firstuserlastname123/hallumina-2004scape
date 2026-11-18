@@ -473,7 +473,7 @@ export class StuckDetector {
  * XP-stall watchdog — measures real progress by XP gain, not by position.
  *
  * Counts ticks without a `notifyActivity()` call. If the stall exceeds the
- * limit the bot is teleported to safety. Banking states can be paused so a
+ * limit the task is deferred. Banking states can be paused so a
  * legitimate bank trip doesn't trigger a false rescue.
  *
  * Usage in a task's tick():
@@ -490,15 +490,16 @@ export class StuckDetector {
 export class ProgressWatchdog {
     private readonly limit: number;
     private stallTicks = 0;
+    private travelSerial = -1;
 
     /**
-     * When set, the watchdog teleports here instead of Lumbridge on stall.
-     * Set to the task's activity location so a rescued bot lands near its target.
+     * Activity destination retained for callers' diagnostics. A stall never
+     * grants travel to this tile.
      */
     destination?: [number, number, number];
 
     /**
-     * @param stallTickLimit  Ticks without XP before teleport (default 100 ≈ 1 min).
+     * @param stallTickLimit Ticks without activity before task deferral.
      *                        Short enough to rescue stuck bots quickly, but long enough
      *                        to cover legitimate bank trips and mid-walk delays.
      */
@@ -515,17 +516,17 @@ export class ProgressWatchdog {
      * Call every tick. Pass `paused=true` when the task is in a banking state
      * to avoid triggering during legitimate bank trips.
      *
-     * Returns true if the bot was teleported (task should call reset() and return).
+     * Returns true if the task was deferred (the caller should return).
      */
     check(player: Player, paused = false): boolean {
         if (paused) return false;
-        if (++this.stallTicks < this.limit) return false;
-        if (this.destination) {
-            const [x, z, level] = this.destination;
-            botTeleport(player, x, z, level);
-        } else {
-            teleportToSafety(player);
+        const serial = (player as any)._bot?.navigation.meaningfulTravelSerial;
+        if (serial !== undefined && serial !== this.travelSerial) {
+            if (this.travelSerial !== -1) this.stallTicks = 0;
+            this.travelSerial = serial;
         }
+        if (++this.stallTicks < this.limit) return false;
+        (player as any)._bot?.deferCurrentTask('activity watchdog: no progress');
         this.reset();
         return true;
     }

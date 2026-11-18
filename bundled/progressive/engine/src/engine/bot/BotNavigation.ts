@@ -29,8 +29,49 @@
  */
 
 import { CollisionType } from '@2004scape/rsmod-pathfinder';
-import { canTravel, isMapBlocked, botWalkPath } from '#/engine/GameMap.js';
+import { canTravel, isMapBlocked, botWalkPath, botFindPath, findPathToLoc, reachedLoc } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
+import LocType from '#/cache/config/LocType.js';
+import type Loc from '#/engine/entity/Loc.js';
+import type Player from '#/engine/entity/Player.js';
+
+/** A real, reachable operating position, respecting rotation and forceapproach. */
+export function findLocApproach(player: Player, loc: Loc): { x: number; z: number; path: Uint32Array } | null {
+    if (player.level !== loc.level || !loc.isValid()) return null;
+    const forceapproach = LocType.get(loc.type).forceapproach;
+    const operable = (x: number, z: number) => reachedLoc(loc.level, x, z, loc.x, loc.z,
+        loc.width, loc.length, player.width, loc.angle, loc.shape, forceapproach);
+    if (!isBotTileBlocked(player.level, player.x, player.z) && operable(player.x, player.z)) {
+        return { x: player.x, z: player.z, path: new Uint32Array() };
+    }
+    const accept = (path: Uint32Array) => {
+        const safe = trimPathAtCsvBlock(player.level, path, player.x, player.z);
+        if (!safe.length) return null;
+        const end = safe[safe.length - 1];
+        const x = (end >> 14) & 0x3fff;
+        const z = end & 0x3fff;
+        if (isBotTileBlocked(player.level, x, z) || !operable(x, z) || validateBotPath(player.level, player.x, player.z, safe) !== 'ok') return null;
+        return { x, z, path: safe };
+    };
+    const native = accept(findPathToLoc(player.level, player.x, player.z, loc.x, loc.z,
+        player.width, loc.width, loc.length, loc.angle, loc.shape, forceapproach));
+    if (native) return native;
+    // The supplementary CSV may reject the native endpoint. Try the other
+    // legal faces, rather than settling for a merely nearby or blocked tile.
+    const candidates: { x: number; z: number }[] = [];
+    for (let x = loc.x - 1; x <= loc.x + loc.width; x++) {
+        for (let z = loc.z - 1; z <= loc.z + loc.length; z++) {
+            if (!isBotTileBlocked(player.level, x, z) && operable(x, z)) candidates.push({ x, z });
+        }
+    }
+    candidates.sort((a, b) => Math.max(Math.abs(a.x - player.x), Math.abs(a.z - player.z)) -
+        Math.max(Math.abs(b.x - player.x), Math.abs(b.z - player.z)));
+    for (const tile of candidates) {
+        const route = accept(botFindPath(player.level, player.x, player.z, tile.x, tile.z));
+        if (route) return route;
+    }
+    return null;
+}
 
 // ── canBotStep ────────────────────────────────────────────────────────────────
 

@@ -216,3 +216,25 @@ test('a short successful local trip credits arrival once without allowing statio
     route.request(21, 0, 0, 21, 0, 0, 4);
     assert.equal(route.failures, 1);
 });
+
+test('travel toward a stable gateway extends the stall deadline without replenishing retries', () => {
+    const retry = new BotRouteRetry();
+    retry.request(0, 0, 0, 0, -50, 0, 0);
+    retry.fail(0);
+    retry.setIntermediate(0, 200, 0, 0, 0, 0);
+    // The legitimate gateway route initially leads away from the final goal.
+    for (let tick = 1; tick <= 150; tick++) retry.request(0, tick, 0, 0, -50, 0, tick);
+    assert.equal(retry.isStalled(150), false);
+    assert.equal(retry.failures, 1);
+    assert.equal(retry.isStalled(250), true);
+
+    // Selecting other gateways while stationary cannot count as travel.
+    for (let tick = 151; tick <= 300; tick++) {
+        retry.setIntermediate(0, tick + 200, 0, 0, 150, 0);
+        retry.request(0, 150, 0, 0, -50, 0, tick);
+    }
+    assert.equal(retry.isStalled(300), true);
+    assert.equal(retry.failures, 1);
+    retry.request(0, 150, 0, 30, -50, 0, 301);
+    assert.equal(retry.intermediateTarget, null);
+});

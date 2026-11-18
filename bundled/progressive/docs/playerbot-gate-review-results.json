@@ -1,0 +1,631 @@
+{
+  "reviewedCommit": "ef8f9fe5901c7a79a290fd76c22b3180153c4504",
+  "scope": "Focused real-map diagnostics and one gate-verification correction. No timeout, detector, resource-task or acquisition-radius changes; no full population reruns.",
+  "sourceSha256": {
+    "BotObstacles.ts": "e5e751de9a9bb9e8b9a09f29d64523316d4aaeba0b7e6b13f80b5911ae40dbd2",
+    "BotAction.ts": "5d8d5339e6529b598bb1ace0b3009208949a61655d91f42df5099c8b44f6c73a",
+    "BotMovementMonitor.ts": "a8aa31914aef62223468f59812d74b006f7775831438e248f7633634d0044608"
+  },
+  "obstacleDeadlineTicks": 25,
+  "acquisitionAudit": {
+    "commonRequestedRadii": [5, 8],
+    "wideExplicitRequestedRadii": [12, 20, 30],
+    "sharedLocMetric": "Manhattan distance <= 2 * requested radius, additionally bounded by visited zones.",
+    "nativeSceneryVisibility": "OpLocHandler rejects coordinates outside originX/originZ +/-52; BuildArea is 13x13 zones (104 tiles). This differs from NPC draw distance.",
+    "visibilityDecision": "No new arbitrary radius or timeout extension: these probes do not reproduce out-of-scene acquisition in a normal client build area. Broad recovery searches remain a documented limit."
+  },
+  "nearDoorBefore": {
+    "name": "near Zanaris door",
+    "from": [3203, 3174],
+    "requestedRadius": 5,
+    "run": false,
+    "events": [
+      {
+        "tick": 0,
+        "event": "gate_attempt",
+        "message": "Interact op1 at (3202,3169,0)"
+      },
+      {
+        "tick": 1,
+        "event": "detail",
+        "message": "Online at (3203, 3173, 0) slot=1"
+      },
+      {
+        "tick": 25,
+        "event": "obstacle_failed",
+        "message": "[Navigation] obstacle_failed at (3202,3169,0) task=GateProbe toward interaction target"
+      }
+    ],
+    "scripts": [
+      {
+        "tick": 6,
+        "name": "[oploc1,zanarisdoor]",
+        "at": [3201, 3169]
+      }
+    ],
+    "gate": {
+      "name": "zanarisdoor",
+      "type": 2406,
+      "at": [3202, 3169],
+      "shape": 0,
+      "angle": 0,
+      "manhattan": 6,
+      "chebyshev": 5,
+      "pathSteps": 5,
+      "waypoints": 3
+    },
+    "accepted": true,
+    "pending": false,
+    "end": [3202, 3169]
+  },
+  "nearDoorAfter": {
+    "name": "near Zanaris door",
+    "from": [3203, 3174],
+    "requestedRadius": 5,
+    "run": false,
+    "events": [
+      {
+        "tick": 0,
+        "event": "gate_attempt",
+        "message": "Interact op1 at (3202,3169,0)"
+      },
+      {
+        "tick": 1,
+        "event": "detail",
+        "message": "Online at (3203, 3173, 0) slot=1"
+      },
+      {
+        "tick": 6,
+        "event": "gate_opened",
+        "message": "Obstacle passed at (3202,3169,0)"
+      }
+    ],
+    "scripts": [
+      {
+        "tick": 6,
+        "name": "[oploc1,zanarisdoor]",
+        "at": [3201, 3169]
+      }
+    ],
+    "gate": {
+      "name": "zanarisdoor",
+      "type": 2406,
+      "at": [3202, 3169],
+      "shape": 0,
+      "angle": 0,
+      "manhattan": 6,
+      "chebyshev": 5,
+      "pathSteps": 5,
+      "waypoints": 3
+    },
+    "accepted": true,
+    "pending": false,
+    "end": [3202, 3169]
+  },
+  "timingExamples": [
+    {
+      "name": "sheep south",
+      "from": [3213, 3253],
+      "requestedRadius": 8,
+      "run": false,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (3213,3261,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (3213, 3254, 0) slot=1"
+        },
+        {
+          "tick": 8,
+          "event": "gate_opened",
+          "message": "Obstacle passed at (3213,3261,0)"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 8,
+          "name": "[oploc1,_gate_main_closed]",
+          "at": [3213, 3260]
+        }
+      ],
+      "gate": {
+        "name": "loc_1551",
+        "type": 1551,
+        "at": [3213, 3261],
+        "shape": 0,
+        "angle": 0,
+        "manhattan": 8,
+        "chebyshev": 8,
+        "pathSteps": 7,
+        "waypoints": 1
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [3213, 3260]
+    },
+    {
+      "name": "cow pen running",
+      "from": [3237, 3297],
+      "requestedRadius": 5,
+      "run": true,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (3241,3301,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (3238, 3299, 0) slot=5"
+        },
+        {
+          "tick": 3,
+          "event": "gate_opened",
+          "message": "Obstacle passed at (3241,3301,0)"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 3,
+          "name": "[oploc1,_gate_main_closed]",
+          "at": [3240, 3301]
+        }
+      ],
+      "gate": {
+        "name": "loc_1551",
+        "type": 1551,
+        "at": [3241, 3301],
+        "shape": 0,
+        "angle": 0,
+        "manhattan": 8,
+        "chebyshev": 4,
+        "pathSteps": 4,
+        "waypoints": 2
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [3240, 3301]
+    },
+    {
+      "name": "tutorial spawn",
+      "from": [3097, 3107],
+      "requestedRadius": 8,
+      "run": false,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (3098,3107,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (3097, 3107, 0) slot=8"
+        },
+        {
+          "tick": 25,
+          "event": "obstacle_failed",
+          "message": "[Navigation] obstacle_failed at (3097,3107,0) task=GateProbe toward interaction target"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 1,
+          "name": "[oploc1,newbie_door1]",
+          "at": [3097, 3107]
+        }
+      ],
+      "gate": {
+        "name": "newbie_door1",
+        "type": 3014,
+        "at": [3098, 3107],
+        "shape": 0,
+        "angle": 0,
+        "manhattan": 1,
+        "chebyshev": 1,
+        "pathSteps": 0,
+        "waypoints": 0
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [3097, 3107]
+    },
+    {
+      "name": "gnome south",
+      "from": [2461, 3372],
+      "requestedRadius": 8,
+      "run": false,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (2459,3383,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (2461, 3373, 0) slot=9"
+        },
+        {
+          "tick": 25,
+          "event": "obstacle_failed",
+          "message": "[Navigation] obstacle_failed at (2461,3380,0) task=GateProbe toward interaction target"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 11,
+          "name": "[oploc1,gnome_areagate]",
+          "at": [2462, 3382]
+        }
+      ],
+      "gate": {
+        "name": "gnome_areagate",
+        "type": 190,
+        "at": [2459, 3383],
+        "shape": 10,
+        "angle": 2,
+        "manhattan": 13,
+        "chebyshev": 11,
+        "pathSteps": 10,
+        "waypoints": 3
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [2461, 3380]
+    },
+    {
+      "name": "gnome north",
+      "from": [2461, 3388],
+      "requestedRadius": 8,
+      "run": false,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (2459,3383,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (2461, 3387, 0) slot=10"
+        },
+        {
+          "tick": 6,
+          "event": "gate_opened",
+          "message": "Obstacle passed at (2459,3383,0)"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 4,
+          "name": "[oploc1,gnome_areagate]",
+          "at": [2461, 3385]
+        }
+      ],
+      "gate": {
+        "name": "gnome_areagate",
+        "type": 190,
+        "at": [2459, 3383],
+        "shape": 10,
+        "angle": 2,
+        "manhattan": 7,
+        "chebyshev": 5,
+        "pathSteps": 3,
+        "waypoints": 1
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [2461, 3382]
+    },
+    {
+      "name": "varrock locked",
+      "from": [3273, 3417],
+      "requestedRadius": 5,
+      "run": false,
+      "events": [
+        {
+          "tick": 0,
+          "event": "gate_attempt",
+          "message": "Interact op1 at (3273,3417,0)"
+        },
+        {
+          "tick": 1,
+          "event": "detail",
+          "message": "Online at (3273, 3417, 0) slot=11"
+        },
+        {
+          "tick": 25,
+          "event": "obstacle_failed",
+          "message": "[Navigation] obstacle_failed at (3273,3417,0) task=GateProbe toward interaction target"
+        }
+      ],
+      "scripts": [
+        {
+          "tick": 1,
+          "name": "[oploc1,loc_1591]",
+          "at": [3273, 3417]
+        }
+      ],
+      "gate": {
+        "name": "loc_1591",
+        "type": 1591,
+        "at": [3273, 3417],
+        "shape": 0,
+        "angle": 0,
+        "manhattan": 0,
+        "chebyshev": 0,
+        "pathSteps": 0,
+        "waypoints": 0
+      },
+      "accepted": true,
+      "pending": false,
+      "end": [3273, 3417]
+    }
+  ],
+  "oscillationDiagnostic": {
+    "seed": 254,
+    "ticks": 1000,
+    "bots": 3,
+    "worldProcessing": "Full native World.cycle with real NPCs, player movement, scripts and zone updates. Selected tasks and starting characters are fixture data; this is not a population throughput comparison.",
+    "cycles": [
+      {
+        "tick": 125,
+        "bot": "probe_mine",
+        "event": "navigation_oscillation",
+        "message": "[Navigation] oscillating at (3285,3364,0) task=Mine \u2014 clearing waypoints",
+        "position": [3285, 3364, 0],
+        "task": "Mine",
+        "state": "approach",
+        "cycle": [
+          [3285, 3363, 0],
+          [3285, 3364, 0],
+          [3285, 3363, 0],
+          [3285, 3364, 0],
+          [3285, 3363, 0],
+          [3285, 3364, 0]
+        ],
+        "recent": [
+          {
+            "tick": 114,
+            "position": [3285, 3364],
+            "state": "interact",
+            "goal": "3286,3364,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 115,
+            "position": [3285, 3364],
+            "state": "interact",
+            "goal": "3286,3364,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 116,
+            "position": [3285, 3364],
+            "state": "interact",
+            "goal": "3286,3364,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 117,
+            "position": [3285, 3364],
+            "state": "interact",
+            "goal": "3286,3364,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 118,
+            "position": [3285, 3364],
+            "state": "interact",
+            "goal": "3286,3364,0",
+            "target": null
+          },
+          {
+            "tick": 119,
+            "position": [3285, 3364],
+            "state": "approach",
+            "goal": "3286,3364,0",
+            "target": null
+          },
+          {
+            "tick": 120,
+            "position": [3285, 3363],
+            "state": "approach",
+            "goal": "3284,3363,0",
+            "target": null
+          },
+          {
+            "tick": 121,
+            "position": [3285, 3364],
+            "state": "approach",
+            "goal": "3286,3364,0",
+            "target": null
+          },
+          {
+            "tick": 122,
+            "position": [3285, 3363],
+            "state": "approach",
+            "goal": "3284,3363,0",
+            "target": null
+          },
+          {
+            "tick": 123,
+            "position": [3285, 3364],
+            "state": "approach",
+            "goal": "3286,3364,0",
+            "target": null
+          },
+          {
+            "tick": 124,
+            "position": [3285, 3363],
+            "state": "approach",
+            "goal": "3284,3363,0",
+            "target": null
+          },
+          {
+            "tick": 125,
+            "position": [3285, 3364],
+            "state": "approach",
+            "goal": "3286,3364,0",
+            "target": null
+          }
+        ],
+        "target": null
+      },
+      {
+        "tick": 861,
+        "bot": "probe_mine",
+        "event": "navigation_oscillation",
+        "message": "[Navigation] oscillating at (3284,3365,0) task=Mine \u2014 clearing waypoints",
+        "position": [3284, 3365, 0],
+        "task": "Mine",
+        "state": "approach",
+        "cycle": [
+          [3286, 3365, 0],
+          [3284, 3365, 0],
+          [3286, 3365, 0],
+          [3284, 3365, 0],
+          [3286, 3365, 0],
+          [3284, 3365, 0]
+        ],
+        "recent": [
+          {
+            "tick": 850,
+            "position": [3284, 3365],
+            "state": "interact",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 851,
+            "position": [3284, 3365],
+            "state": "interact",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 852,
+            "position": [3284, 3365],
+            "state": "interact",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 853,
+            "position": [3284, 3365],
+            "state": "interact",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 854,
+            "position": [3284, 3365],
+            "state": "interact",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 855,
+            "position": [3284, 3365],
+            "state": "approach",
+            "goal": "3283,3365,0",
+            "target": [3284, 3364]
+          },
+          {
+            "tick": 856,
+            "position": [3286, 3365],
+            "state": "approach",
+            "goal": "3287,3365,0",
+            "target": null
+          },
+          {
+            "tick": 857,
+            "position": [3284, 3365],
+            "state": "approach",
+            "goal": "3284,3364,0",
+            "target": null
+          },
+          {
+            "tick": 858,
+            "position": [3286, 3365],
+            "state": "approach",
+            "goal": "3287,3365,0",
+            "target": null
+          },
+          {
+            "tick": 859,
+            "position": [3284, 3365],
+            "state": "approach",
+            "goal": "3284,3364,0",
+            "target": null
+          },
+          {
+            "tick": 860,
+            "position": [3286, 3365],
+            "state": "approach",
+            "goal": "3287,3365,0",
+            "target": null
+          },
+          {
+            "tick": 861,
+            "position": [3284, 3365],
+            "state": "approach",
+            "goal": "3284,3364,0",
+            "target": null
+          }
+        ],
+        "target": null
+      }
+    ],
+    "final": [
+      {
+        "name": "probe_rat",
+        "x": 3200,
+        "z": 3189,
+        "task": "Combat",
+        "interrupted": true,
+        "miningXp": 0,
+        "failures": 0
+      },
+      {
+        "name": "probe_cow",
+        "x": 3237,
+        "z": 3299,
+        "task": "Combat",
+        "interrupted": true,
+        "miningXp": 0,
+        "failures": 0
+      },
+      {
+        "name": "probe_mine",
+        "x": 3286,
+        "z": 3365,
+        "task": "Mine",
+        "interrupted": false,
+        "miningXp": 6300,
+        "failures": 1
+      }
+    ],
+    "interpretation": "Two real period-2 mining approach cycles are observed. The mining bot subsequently earns 6300 internal Mining XP. Neither Combat probe reproduces a cycle; this does not explain the population Combat increase or establish its absence."
+  },
+  "validation": {
+    "tests": 32,
+    "pass": 32,
+    "fail": 0,
+    "logSha256": "f9b6454092bb5d5c685710642b2ed969360c12cab53653b4598d0d09968b4c24",
+    "newEnvironmentScenario": "native door crossing is verified from its reachable operating side after a detour",
+    "before": "Fails at unchanged source ef8f9fe: crossing finished, pending obstacle remains until false timeout.",
+    "after": "Native script and observed completion at tick 6; no retry charged. Locked-door suppression and all earlier fixtures remain passing.",
+    "typescript": "Same eleven pre-existing diagnostics; normalized output matches the prior checked source.",
+    "focusedLint": "BotObstacles.ts: zero errors.",
+    "environmentScenarios": 12
+  },
+  "populationComparison": "The unchanged playerbot-land-transport-simulation-results.json measures source 1a0ba61, before this focused correction. No claim is made that its aggregate failure/oscillation rates reflect this later fix.",
+  "mapDataReference": "Unchanged r254 map/script hashes in playerbot-land-transport-simulation-results.json."
+}
