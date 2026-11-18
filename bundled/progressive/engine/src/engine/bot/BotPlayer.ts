@@ -458,7 +458,7 @@ export class BotPlayer {
 
     navigationFailed(reason: string): void {
         if (this.activeTask?.interrupted) return;
-        if (reason === 'path_failed' || reason === 'no_progress') this.log(`[Navigation] ${reason} at (${this.player.x},${this.player.z},${this.player.level}) task=${this.activeTask?.name} toward ${this.navigation.destinationLabel}`, 'warn', reason);
+        if (reason !== 'stuck' && reason !== 'oscillating') this.log(`[Navigation] ${reason} at (${this.player.x},${this.player.z},${this.player.level}) task=${this.activeTask?.name} toward ${this.navigation.destinationLabel}`, 'warn', reason);
         if (this.navigation.fail(this.ticksAlive)) this.deferCurrentTask(`navigation: ${reason}`);
     }
 

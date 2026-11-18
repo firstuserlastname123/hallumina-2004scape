@@ -1,5 +1,6 @@
 /** Run only in a disposable assembled runtime. See docs/playerbot-reliability.md. */
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import path from 'node:path';
@@ -36,6 +37,8 @@ const { PlayerLoading } = await import('#/engine/entity/PlayerLoading.js');
 const { default: InvType } = await import('#/cache/config/InvType.js');
 const { default: Environment } = await import('#/util/Environment.js');
 const { default: Player } = await import('#/engine/entity/Player.js');
+const { default: Loc } = await import('#/engine/entity/Loc.js');
+const { default: LocType } = await import('#/cache/config/LocType.js');
 const { canTravel } = await import('#/engine/GameMap.js');
 const { CollisionType } = await import('@2004scape/rsmod-pathfinder');
 const logModule = fs.existsSync('src/engine/bot/BotLog.ts') ? await import('#/engine/bot/BotLog.js') : null;
@@ -44,6 +47,69 @@ if (Environment.ENGINE_REVISION !== 254) throw new Error('This simulation requir
 
 const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0,
     routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
+// Same observers are copied to both implementations. Script starts include the
+// baseline's direct gate execution as well as normal engine-dispatched scripts.
+const obstacles = { gateClicks: 0, gateScripts: 0, gateOpened: 0, gateUnverified: 0,
+    transitionClicks: 0, transitionScripts: 0, transitionCompleted: 0, transitionUnverified: 0 };
+const completions: Record<string, number> = {};
+const pendingObstacles: { player: InstanceType<typeof Player>; loc: InstanceType<typeof Loc>; type: number;
+    angle: number; shape: number; level: number; x: number; z: number; tick: number; gate: boolean }[] = [];
+function obstacleKind(loc: InstanceType<typeof Loc>): 'gate' | 'transition' | null {
+    const t = LocType.get(loc.type);
+    const ops = (t.op ?? []).filter((op): op is string => typeof op === 'string');
+    if (/door|gate|curtain/i.test(t.name ?? '') && ops.some(op => /^(open|walk-through|pass-through|pay)/i.test(op))) return 'gate';
+    if (ops.some(op => /^(climb|walk-on|balance|squeeze|swing|cross|jump)/i.test(op))) return 'transition';
+    return null;
+}
+function edgeOpen(o: typeof pendingObstacles[number]): boolean {
+    const dx = [-1, 0, 1, 0][o.angle];
+    const dz = [0, 1, 0, -1][o.angle];
+    return canTravel(o.level, o.loc.x, o.loc.z, dx, dz, 1, 0, CollisionType.NORMAL);
+}
+function observeObstacles(final = false): void {
+    for (let i = pendingObstacles.length - 1; i >= 0; i--) {
+        const o = pendingObstacles[i];
+        const changed = !o.loc.isValid() || o.loc.type !== o.type || o.loc.angle !== o.angle || o.loc.shape !== o.shape;
+        const settled = !o.player.delayed && !o.player.activeScript && !o.player.hasInteraction();
+        const completed = o.gate ? changed && edgeOpen(o) : settled && (
+            o.player.level !== o.level || Math.max(Math.abs(o.player.x - o.x), Math.abs(o.player.z - o.z)) >= 2);
+        if (completed || (!o.gate && settled) || World.currentTick - o.tick >= 25 || final) {
+            if (o.gate) { if (completed) obstacles.gateOpened++; else obstacles.gateUnverified++; }
+            else { if (completed) obstacles.transitionCompleted++; else obstacles.transitionUnverified++; }
+            pendingObstacles.splice(i, 1);
+        }
+    }
+}
+const setInteraction = Player.prototype.setInteraction;
+Player.prototype.setInteraction = function (...args) {
+    const result = setInteraction.apply(this, args);
+    if (result && this.is_bot && args[1] instanceof Loc) {
+        const kind = obstacleKind(args[1]);
+        if (kind === 'gate') obstacles.gateClicks++;
+        if (kind === 'transition') obstacles.transitionClicks++;
+    }
+    return result;
+};
+const executeScript = Player.prototype.executeScript;
+Player.prototype.executeScript = function (...args) {
+    const state = args[0];
+    const loc = state._activeLoc;
+    if (this.is_bot && !args[2] && loc && /oploc[1-5],/.test(state.script.name)) {
+        const kind = obstacleKind(loc);
+        if (kind) {
+            if (kind === 'gate') obstacles.gateScripts++; else obstacles.transitionScripts++;
+            pendingObstacles.push({ player: this, loc, type: loc.type, angle: loc.angle, shape: loc.shape,
+                level: this.level, x: this.x, z: this.z, tick: World.currentTick, gate: kind === 'gate' });
+        }
+    }
+    return executeScript.apply(this, args);
+};
+const completeTask = (BotPlayer.prototype as any)._recordComplete;
+(BotPlayer.prototype as any)._recordComplete = function (...args: any[]) {
+    const name = this.currentTask?.name ?? 'unknown';
+    completions[name] = (completions[name] ?? 0) + 1;
+    return completeTask.apply(this, args);
+};
 let insideTaskLog = 0;
 // Observe timeout diagnostics before either the legacy wall-clock throttle or the
 // new logger can filter them. Emitted timeout lines are a separate volume metric.
@@ -179,6 +245,7 @@ await new Promise<void>((resolve, reject) => {
         const start = performance.now();
         cycle();
         worldTimes.push(performance.now() - start);
+        observeObstacles();
         if (World.currentTick !== prev + 1) { reject(new Error('World cycle failed')); return; }
         if (World.currentTick % 1000 === 0) {
             const bots = progression();
@@ -189,6 +256,7 @@ await new Promise<void>((resolve, reject) => {
     };
     World.cycle();
 });
+observeObstacles(true);
 const bots = progression();
 const active = World.getTotalPlayers();
 for (const bot of population()) World.removePlayer(bot.player);
@@ -226,7 +294,9 @@ const report = { seed, ticks, simulatedMinutes: ticks * 0.6 / 60, intervalMs: in
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },
-    active, counters, eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
+    active, counters, obstacles, taskCompletions: completions, productionFingerprints: Object.fromEntries([
+        'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
+    ].map(file => [file, fs.existsSync(`src/engine/bot/${file}`) ? createHash('sha256').update(fs.readFileSync(`src/engine/bot/${file}`)).digest('hex') : null])), eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
     steadyWorldTiming: timing(worldTimes.slice(20)), steadyBotTiming: timing(botTimes.slice(20)),
     xpGained: bots.reduce((sum, b) => sum + b.xpGained, 0), levelsGained: bots.reduce((sum, b) => sum + b.levelsGained, 0),
     botsWithXp: bots.filter(bot => bot.xpGained > 0).length, verifiedSaves,

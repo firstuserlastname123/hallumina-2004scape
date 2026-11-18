@@ -2,7 +2,7 @@
  * BotAction.ts
  *
  * Low-level primitives that drive a real Player using the actual engine APIs.
- * Nothing here teleports. Every movement goes through the pathfinder.
+ * Walking and obstacle interactions respect the engine collision and access rules.
  * Every interaction goes through setInteraction(). The engine's processInteraction()
  * client click does.
  *
@@ -51,6 +51,7 @@ import InvType from '#/cache/config/InvType.js';
 import { getWorld } from '#/engine/bot/BotWorld.js';
 import { botWalkPath, botFindPath } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
+import { pollObstacle, hasPendingObstacle, isObstacleSuppressed, tryObstacle } from '#/engine/bot/BotObstacles.js';
 import { trimPathAtCsvBlock, findNearestWalkableTile, canBotStep } from '#/engine/bot/BotNavigation.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
@@ -203,13 +204,8 @@ type GatewayRegion = {
      * If set, floor of the exit. Defaults to 0 (ground floor).
      */
     readonly exitLevel?: number;
-    /**
-     * If set, the bot is teleported instead of interacting with the gate.
-     * Use for gates that require a toll or complex dialog that bots cannot
-     * handle (e.g. the Al Kharid toll gate). Teleport location is
-     * a random tile in the exit area (or approach area when leaving).
-     */
-    readonly teleport?: boolean;
+    /** Requires dialog/travel support that navigation cannot safely automate. */
+    readonly unsupported?: boolean;
 };
 
 const GATEWAY_REGIONS: GatewayRegion[] = [
@@ -321,25 +317,6 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
         exit: [[3234, 3465], [3234, 3466]]
     },
     {
-        // ── Lumbridge ↔ Al Kharid (gate) ──────────────────────────────────────
-        // The Lumbridge-AlKharid wall runs at x ≈ 3268, z ≈ 3197..3244.
-        // Gate tile: ~[3268, 3227].  Destinations inside: warriors, bank,
-        // scimitar shop, furnace, etc.  Bots must approach from the west side
-        // (Lumbridge) to open the gate — NOT from the south where the wall has
-        // no opening.  Without this routing a bot walking to [3294, 3172] hits
-        // the wall 55 tiles south of the gate and can never open it.
-        //
-        // The gate charges a 10-coin toll and opens a dialog that bots cannot
-        // handle.  Once the bot reaches the approach tile it is teleported
-        // directly to the inside (3268, 3227) — the first open tile past the wall.
-        name: 'AlKharid',
-        destInRegion: (x, z, l) => checkRegion(x, z, l, [
-            'Desert']),
-        approach: [[3267, 3227], [3267, 3228]],
-        exit:     [[3268, 3227], [3268, 3228]],
-        teleport: true
-    },
-    {
         // ── Varrock ↔ Al Kharid ───────────────────────────────────────────────
         // Bots from Varrock should go through the opening in the fence to
         // the north instead of going to the south gate.
@@ -352,13 +329,13 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
     {
         // ── Al Kharid ↔ Desert (gate) ─────────────────────────────────────────
         // Access to the Kharidian desert via Shantay Pass. Requires a toll/pass
-        // so bots teleport through the gate.
+        // Navigation defers this unsupported crossing.
         name: 'ShantayPass',
         destInRegion: (x, z, l) => checkRegion(x, z, l, [
             'DesertSouth']),
         approach: [[3303, 3118], [3304, 3118]],
         exit: [[3303, 3115], [3304, 3115]],
-        teleport: true
+        unsupported: true
     },
     {
         // ── Port Sarim ↔ Draynor ──────────────────────────────────────────────
@@ -407,13 +384,13 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
     {
         // ── Port Sarim ↔ Entrana (boat) ───────────────────────────────────────
         // Bots heading to Entrana (gathering herblore supplies or woodcutting)
-        // walk to the Port Sarim northern docks and teleport to Entrana.
+        // This boat requires dialog support; navigation defers the crossing.
         name: 'Entrana',
         destInRegion: (x, z, l) => checkRegion(x, z, l, [
             'Entrana']),
         approach: [[3048, 3234]],
         exit: [[2834, 3335]],
-        teleport: true
+        unsupported: true
     },
     {
         // ── Falador ↔ Taverley (gate) ─────────────────────────────────────────
@@ -474,9 +451,9 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
     {
         // ── Port Sarim ↔ Karamja (boat) ───────────────────────────────────────
         // Bots heading to Karamja fishing spots (x < 2970) walk to the Port
-        // Sarim docks (~3029, 3217) and are teleported to the Karamja landing
+        // Sarim docks (~3029, 3217) and would land at the Karamja landing
         // (2956, 3146). The boat costs 30 coins and triggers a dialog that
-        // bots cannot handle natively, so teleport is used instead.
+        // bots cannot handle natively; navigation defers the crossing.
         name: 'MusaPointBoat',
         destInRegion: (x, z, l) => checkRegion(x, z, l, [
             'Karamja',
@@ -486,7 +463,7 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
             'Fremennik']),
         approach: [[3029, 3217]],
         exit: [[2956, 3146]],
-        teleport: true
+        unsupported: true
     },
     {
         // ── Musa Point ↔ Brimhaven (gate) ─────────────────────────────────────
@@ -711,7 +688,7 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
         // ── Brimhaven ↔ Ardougne (boat) ───────────────────────────────────────
         // Bots heading to Ardougne can take the boat from Karamja.
         // The boat costs 30 coins and triggers a dialog that
-        // bots cannot handle natively, so teleport is used instead.
+        // bots cannot handle natively; navigation defers the crossing.
         name: 'BrimhavenBoat',
         destInRegion: (x, z, l) => checkRegion(x, z, l, [
             'Kandarin',
@@ -720,7 +697,7 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
             'Fremennik']),
         approach: [[2772, 3234]],
         exit: [[2683, 3271]],
-        teleport: true
+        unsupported: true
     },
     {
         // ── Legends' Guild ↔ Ardougne Docks ───────────────────────────────────
@@ -1809,7 +1786,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
         // Try opening one within 8 tiles before falling back to the compass sweep.
         // openNearbyGate only matches CLOSED doors (locs with Open/Walk-through ops
         // but without Close ops), so an already-open gate is never double-interacted.
-        if (openNearbyGate(player, 8)) return;
+        if (openGateToward(player, destX, destZ, 8)) return;
     } else {
         // Long distance — try midpoints at the direct heading then sweep outward
         // so the pathfinder can find a clear intermediate tile around any obstacle
@@ -1878,6 +1855,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
  * moveSpeed is INSTANT, permanently blocking headless player movement.
  */
 export function walkTo(player: Player, destX: number, destZ: number, level = 0): void {
+    if (pollObstacle(player)) return;
     const bot = (player as any)._bot;
     if (bot) {
         if (bot.activeTask?.interrupted) return;
@@ -1947,6 +1925,17 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
 
     if (Math.abs(player.x - destX) < 1 && Math.abs(player.z - destZ) < 1 && player.level === level) return;
 
+    // A collision-respecting detour may temporarily leave the source region.
+    // Finish approaching its chosen gateway before classifying regions again;
+    // otherwise the next partial path can send the bot back through a gateway
+    // it has already passed (notably the northern Al Kharid approach).
+    const intermediate = (player as any)._bot?.navigation.intermediateTarget;
+    if (intermediate && intermediate.level === player.level &&
+        Math.max(Math.abs(player.x - intermediate.x), Math.abs(player.z - intermediate.z)) > 5) {
+        _pathTowards(player, intermediate.x, intermediate.z);
+        return;
+    }
+
     // ── Gateway routing ─────────────────────────────────────────────────────
     // If the destination is inside a gated region and the bot is outside,
     // walk to the approach area first, then open the gate, then proceed
@@ -2003,20 +1992,10 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
 
             // If an approach/exit area is defined, check for the optimal tile.
             const bestApproach = closestBetween(approach, [player.x, player.z], [next[0], next[1]]);
-            let bestExit = [exit[0][0], exit[0][1]];
-            if (exit.length > 1) {
-                // If teleport area is defined, use the average.
-                if (curr.teleport) {
-                    bestExit[0] = (exit[0][0] + exit[1][0]) / 2;
-                    bestExit[1] = (exit[0][1] + exit[1][1]) / 2;
-                } else {
-                    bestExit = closestBetween(exit, bestApproach, [next[0], next[1]]);
-                }
-            }
+            const bestExit = closestBetween(exit, bestApproach, [next[0], next[1]]);
 
             // Combine distance from bot to gateway and distance from
-            // gateway to destination. If no teleport, also add distance from
-            // approach to exit. The best gateway has the least total distance.
+            // gateway to destination and from approach to exit. The best gateway has the least total distance.
             // Use Chebyshev distance if the destination requires more
             // vertical/horizontal movement and Manhattan distance for diagonal.
             // This better ensures that we don't pick a gateway behind the bot.
@@ -2026,12 +2005,8 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
             const dz1 = Math.abs(bestApproach[1] - player.z);
             const dx2 = Math.abs(next[0] - bestExit[0]);
             const dz2 = Math.abs(next[1] - bestExit[1]);
-            let dx3 = 0;
-            let dz3 = 0;
-            if (!curr.teleport) {
-                dx3 = Math.abs(bestExit[0] - bestApproach[0]);
-                dz3 = Math.abs(bestExit[1] - bestApproach[1]);
-            }
+            const dx3 = Math.abs(bestExit[0] - bestApproach[0]);
+            const dz3 = Math.abs(bestExit[1] - bestApproach[1]);
 
             let currDist = 0;
             if (diagonal) {
@@ -2070,13 +2045,13 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
         }
     }
 
-    // If a gateway was found, one of 4 things will happen.
-    // 1. If not near approach tile, walk to it first.
-    // 2. If teleport is set, teleport to exit area.
-    // 3. If changing floor, interact with stairs.
-    // 4. Otherwise walk to exit area.
+    // Unsupported dialog/toll crossings fail through the existing retry budget.
+    // Al Kharid uses its existing northern opening instead of the toll gate.
     if (gw && gwExit) {
+        if (gw.unsupported || player.level !== next[2]) return;
         const gwDist = Math.max(Math.abs(player.x - next[0]), Math.abs(player.z - next[1])); // Chebyshev distance
+        const via = gwDist > 5 ? next : nextExit;
+        (player as any)._bot?.navigation.setIntermediate(via[0], via[1], via[2], player.x, player.z, player.level);
 
         if (gwDist > 5) {
             // Not yet at the approach tile — walk toward it first.
@@ -2099,38 +2074,12 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
             return;
         }
 
-        // Close to approach tile — cross the gate.
-        if (gw.teleport) {
-            let teleportDestX = gwExit[0][0];
-            let teleportDestZ = gwExit[0][1];
-            // Toll/dialog gate that bots can't interact with — teleport through.
-            // If teleport area is defined, use random tile in area.
-            if (gwExit.length > 1) {
-                const xMin = Math.min(gwExit[0][0], gwExit[1][0]);
-                const zMin = Math.min(gwExit[0][1], gwExit[1][1]);
-                const xMax = Math.max(gwExit[0][0], gwExit[1][0]);
-                const zMax = Math.max(gwExit[0][1], gwExit[1][1]);
-                teleportDestX = xMin + Math.floor(Math.random() * (xMax - xMin + 1));
-                teleportDestZ = zMin + Math.floor(Math.random() * (zMax - zMin + 1));
-            }
-            // If the requested destination is CSV-blocked or WALK_BLOCKED,
-            // find the nearest walkable tile before teleporting.
-            if (BotCollisionMap.isCsvBlocked(nextExit[2], teleportDestX, teleportDestZ)) {
-                const alt = findNearestWalkableTile(nextExit[2], teleportDestX, teleportDestZ, 5);
-                if (!alt) return; // nowhere reachable near this destination
-                teleportDestX = alt.x;
-                teleportDestZ = alt.z;
-            }
-            botTeleport(player, teleportDestX, teleportDestZ, nextExit[2]);
-            return;
-        }
-
         // Changing floor, interact with stairs.
         if (next[2] < nextExit[2] || (next[1] > 4100 && nextExit[1] <= 4100)) {
-            interactNearbyLocByOps(player, 'climb-up', 8);
+            interactNearbyLocByOps(player, 'climb-up', next, nextExit);
             return;
         } else if (next[2] > nextExit[2] || (next[1] <= 4100 && nextExit[1] > 4100)) {
-            interactNearbyLocByOps(player, 'climb-down', 8);
+            interactNearbyLocByOps(player, 'climb-down', next, nextExit);
             return;
         }
 
@@ -2150,6 +2099,9 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
         }
         return;
     }
+    (player as any)._bot?.navigation.clearIntermediate();
+    // No supported floor transition exists for this request.
+    if (player.level !== level) return;
     // No more gateways found, path directly to destination.
 
     // ── Destination validation ───────────────────────────────────────────────
@@ -2184,7 +2136,7 @@ function closestBetween(area: number[][], a: number[], b: number[], csvLevel?: n
         for (let x = xMin; x <= xMax; x++) {
             for (let z = zMin; z <= zMax; z++) {
                 // If set, make sure we get in the area on a walkable tile.
-                if (csvLevel && BotCollisionMap.isCsvBlocked(csvLevel, x, z)) continue;
+                if (csvLevel !== undefined && BotCollisionMap.isCsvBlocked(csvLevel, x, z)) continue;
                 const dxa = x - a[0];
                 const dza = z - a[1];
                 const dxb = x - b[0];
@@ -3271,25 +3223,29 @@ export function setVarp(player: Player, varpName: string, varpId: number, varpVa
  *
  * Returns true if an obstruction was found (interaction queued or walk started).
  */
-function interactNearbyLocByOps(player: Player, keyword: string, radius = 30): boolean {
-    const loc = _findLoc(player.x, player.z, player.level, radius, loc => {
-        const t = LocType.get(loc.type);
-        const ops = (t.op ?? []).filter((o): o is string => typeof o === 'string').map(o => o.toLowerCase());
-        return ops.some(op => op === keyword);
+function interactNearbyLocByOps(player: Player, keyword: string, approach: number[], exit: number[]): boolean {
+    const loc = _findLoc(approach[0], approach[1], player.level, 5, loc => {
+        return !isObstacleSuppressed(player, loc) && (LocType.get(loc.type).op ?? []).some(op => op?.toLowerCase() === keyword);
     });
     if (!loc) return false;
+    // Preserve empty option slots: filtering nulls changes the actual op number.
+    const index = (LocType.get(loc.type).op ?? []).findIndex(op => op?.toLowerCase() === keyword);
+    return _interactObstacle(player, loc, (index + 1) as 1 | 2 | 3 | 4 | 5,
+        { level: exit[2], underground: exit[1] > 4100 });
+}
 
-    if (isAdjacentToLoc(player, loc)) {
-        const t = LocType.get(loc.type);
-        const ops = (t.op ?? []).filter((o): o is string => typeof o === 'string').map(o => o.toLowerCase());
-        let op = 1 + ops.findIndex(i => i === keyword);
-        if (op < 1) op = 1;
-        interactLocOp(player, loc, op as 1 | 2 | 3 | 4 | 5);
-        return true;
+/** Retain the existing interaction/debug hooks around the native click. */
+function _interactObstacle(player: Player, loc: Loc, op: 1 | 2 | 3 | 4 | 5, crossing?: { level: number; underground: boolean }): boolean {
+    if (!tryObstacle(player, loc, op, crossing)) return false;
+    _debugStartInteraction(player, 'interactLocOp', 'loc', loc.type, locDebugName(loc.type), loc.x, loc.z, op);
+    if (!crossing) {
+        try {
+            const name = _debugBotName(player);
+            if (name) BotDebugService.noteRecovery(name, 'gate');
+        } catch {
+            // Debug hooks must never affect gameplay.
+        }
     }
-
-    // Not adjacent — path toward the loc tile.
-    _pathTowards(player, loc.x, loc.z);
     return true;
 }
 
@@ -3299,200 +3255,50 @@ function interactNearbyLocByOps(player: Player, keyword: string, radius = 30): b
  * Returns true if the bot is standing adjacent (within 1 tile of any face)
  * of the given loc, accounting for the loc's width and length.
  */
-export function isAdjacentToLoc(player: Player, loc: { x: number; z: number; type: number }): boolean {
+export function isAdjacentToLoc(player: Player, loc: Loc): boolean {
+    return player.inOperableDistance(loc);
+}
+
+/** Only actual barrier operations qualify; never click decorative Open objects. */
+function gateOp(loc: Loc): 1 | 2 | 3 | 4 | 5 | null {
+    if (TOLL_GATE_TYPE_IDS.has(loc.type)) return null;
     const t = LocType.get(loc.type);
-    const w = t.width ?? 1;
-    const l = t.length ?? 1;
-    const dx = Math.max(0, Math.max(loc.x - player.x, player.x - (loc.x + w - 1)));
-    const dz = Math.max(0, Math.max(loc.z - player.z, player.z - (loc.z + l - 1)));
-    return dx <= 1 && dz <= 1 && dx + dz <= 1;
+    if (!/door|gate|curtain/i.test(t.name ?? '')) return null;
+    const ops = t.op ?? [];
+    if (ops.some(op => /^(close|shut)$/i.test(op ?? ''))) return null;
+    const index = ops.findIndex(op => /^(open|walk-through|pass-through)$/i.test(op ?? ''));
+    return index < 0 ? null : (index + 1) as 1 | 2 | 3 | 4 | 5;
 }
 
-/**
- * Open-action keywords (lowercased) that indicate a closed/passable door or gate.
- * Covers standard "Open", toll gates ("Pay-toll(10gp)"), walk-through doors,
- * and Al Kharid palace curtains (loc_1528: op1="Open").
- */
-const GATE_OPEN_KEYWORDS = ['open', 'pay', 'pay-toll', 'walk-through', 'pass-through', 'enter'];
-const GATE_CLOSE_KEYWORDS = ['close', 'shut'];
+// Tolls, passes and quest/dialog restrictions require explicit game support.
+const TOLL_GATE_TYPE_IDS = new Set([2882, 2883, 1298, 1299, 1300, 1173, 375]);
 
-/** Loc debug-name prefixes that represent closeable barriers (curtains, etc.). */
-const BARRIER_NAME_PREFIXES = ['loc_1528']; // Al Kharid palace curtain (closed state)
-
-/** Big door prefixes - large double doors that also need opening */
-const BIG_DOOR_PREFIXES = ['big door', 'large door', 'double door'];
-
-/**
- * Substrings of loc debugnames that are NEVER gates — purely decorative objects.
- * These are excluded so bots don't try to "open" or interact with them while
- * navigating past them (e.g. picking flowers at Varrock West Bank).
- */
-const DECORATIVE_LOC_FRAGMENTS = ['flower', 'fern', 'plant', 'bush', 'thistle', 'nettle', 'cabbage', 'tulip', 'daisy', 'sunflower', 'chest', 'open chest', 'closed chest'];
-
-/**
- * Directly executes the OPLOC1 script for a gate/door Loc.
- *
- * This bypasses processInteraction, which fails for Locs because:
- *   - pathToPathingTarget() is a no-op for non-PathingEntity targets (Locs)
- *   - tryInteract(false) fires first and hits the "default approach" branch,
- *     setting apRange=-1 and returning false without moving the player
- *   - With no waypoints and no steps taken, "I can't reach that!" fires and
- *     clears the interaction before tryInteract(true) ever gets a chance to run
- *
- * This replicates exactly what tryInteract(true) does when inOperableDistance:
- *   getOpTrigger() → ScriptProvider.getByTrigger(targetOp + 7, ...) i.e. OPLOC1
- *   executeScript(ScriptRunner.init(script, player, gate), true)
- *
- * Returns true if an OPLOC1 script was found and executed.
- */
-function _executeGateScript(player: Player, gate: Loc): boolean {
-    const locType = LocType.get(gate.type);
-    const script = ScriptProvider.getByTrigger(ServerTriggerType.OPLOC1, gate.type, locType.category);
-    if (!script) return false;
-    player.clearPendingAction();
-    player.executeScript(ScriptRunner.init(script, player, gate), true);
-    return true;
-}
-
-/**
- * Walks toward a gate/door using plain waypoints (botWalkPath / botFindPath).
- * Does NOT call _pathTowards — that function calls openNearbyGate internally
- * which would create mutual recursion.
- */
-function _walkToGate(player: Player, gate: Loc): void {
-    let path = botWalkPath(player.level, player.x, player.z, gate.x, gate.z);
-    if (path.length === 0) path = botFindPath(player.level, player.x, player.z, gate.x, gate.z);
-    if (path.length > 0) {
-        player.clearPendingAction();
-        player.queueWaypoints(path);
-    }
-}
-
-/**
- * Scan within `radius` tiles for any closed door, gate, toll gate, or curtain.
- * Handles:
- *   - Standard "Open" ops (doors, gates)
- *   - "Pay-toll(10gp)" variants (Al Kharid gate)
- *   - Walk-through / pass-through doors
- *   - Al Kharid palace curtains (loc_1528 — op1="Open", blockwalk=yes while closed)
- *
- * Behaviour:
- *   - If already adjacent to the gate: directly executes the OPLOC1 script,
- *     bypassing the broken processInteraction path (see _executeGateScript).
- *   - If not yet adjacent: queues plain walk-waypoints toward the gate.
- *     Next call (BotPlayer universal sweep fires every 5 ticks) will execute.
- *
- * Returns true if an obstruction was found (interaction queued or walk started).
- */
+/** Queue one legitimate click and observe the barrier before resuming travel. */
 export function openNearbyGate(player: Player, radius = 30): boolean {
-    const gate = _findLoc(player.x, player.z, player.level, radius, _isClosedGate);
-    if (!gate) return false;
-
-    try {
-        const botName = _debugBotName(player);
-        if (botName) BotDebugService.noteRecovery(botName, 'gate');
-    } catch {
-        // debug hook must never affect gameplay
-    }
-
-    if (isAdjacentToLoc(player, gate)) {
-        // Adjacent — fire the OPLOC1 script directly.
-        if (_executeGateScript(player, gate)) return true;
-        // No OPLOC1 script found (unusual) — fall back to setInteraction.
-        interactLoc(player, gate as any);
-        return true;
-    }
-
-    // Not adjacent — walk toward the gate tile with plain waypoints.
-    // _pathTowards is intentionally NOT used here to avoid mutual recursion
-    // (_pathTowards calls openNearbyGate when the path is fully blocked).
-    _walkToGate(player, gate);
-    return true;
+    if (pollObstacle(player)) return true;
+    const gate = _findLoc(player.x, player.z, player.level, radius,
+        loc => gateOp(loc) !== null && !isObstacleSuppressed(player, loc));
+    return gate ? _interactObstacle(player, gate, gateOp(gate)!) : false;
 }
 
-/**
- * Returns true if the player already has a pending gate/door interaction
- * queued (APLOC1 on a loc whose ops include an open keyword or that matches
- * a known barrier name prefix).
- *
- * walkTo calls this before clearPendingAction to avoid cancelling a gate
- * interaction that was set on the previous tick before the engine could
- * execute it — the root cause of the "sometimes opens, sometimes doesn't"
- * inconsistency.
- */
 function _hasGateInteractionPending(player: Player): boolean {
+    if (hasPendingObstacle(player)) return true;
     const target = player.target;
-    if (!target || !(target instanceof Loc)) return false;
-    if (player.targetOp !== ServerTriggerType.APLOC1) return false;
-    const t = LocType.get((target as Loc).type);
-    // Explicit barrier types (e.g. Al Kharid curtains)
-    if (BARRIER_NAME_PREFIXES.some(p => t.debugname?.startsWith(p))) return true;
-    const ops = (t.op ?? []).filter((o): o is string => typeof o === 'string').map(o => o.toLowerCase());
-    return ops.some(op => GATE_OPEN_KEYWORDS.some(kw => op.startsWith(kw)));
+    if (!(target instanceof Loc)) return false;
+    const op = gateOp(target);
+    return op !== null && player.targetOp === ServerTriggerType.APLOC1 + op - 1;
 }
 
-// Toll gates that bots must never try to open — crossing is handled by the
-// GATEWAY_REGIONS teleport in walkTo instead.
-const TOLL_GATE_TYPE_IDS = new Set([2882, 2883, 1298, 1299, 1300, 1173, 375]); // border_gate_toll_left/right
-
-/** Internal: returns true if `loc` passes the closed-gate predicate. */
-function _isClosedGate(loc: Loc): boolean {
-    if (TOLL_GATE_TYPE_IDS.has(loc.type)) return false;
-    const t = LocType.get(loc.type);
-    // Decorative vegetation — never a gate regardless of any ops.
-    const debugLower = t.debugname?.toLowerCase() ?? '';
-    const nameLower  = (t.name ?? '').toLowerCase();
-    if (DECORATIVE_LOC_FRAGMENTS.some(f => debugLower.includes(f) || nameLower.includes(f))) return false;
-    if (BARRIER_NAME_PREFIXES.some(p => t.debugname?.startsWith(p))) return true;
-    if (BIG_DOOR_PREFIXES.some(p => debugLower.includes(p))) return true;
-    const ops = (t.op ?? []).filter((o): o is string => typeof o === 'string').map(o => o.toLowerCase());
-    const hasOpenOp = ops.some(op => GATE_OPEN_KEYWORDS.some(kw => op.startsWith(kw)));
-    const hasCloseOp = ops.some(op => GATE_CLOSE_KEYWORDS.some(kw => op === kw));
-    return hasOpenOp && !hasCloseOp;
-}
-
-/**
- * Directional variant of openNearbyGate.
- *
- * Scans up to `radius` tiles (default 10) for any closed door or gate that
- * lies roughly BETWEEN the player and (destX, destZ) — defined as a positive
- * dot product between the player→gate vector and the player→destination
- * heading.  Gates that are directly behind or perpendicular to the heading
- * are ignored, preventing the bot from opening unrelated doors while walking.
- *
- * Used by walkTo so that every movement call automatically clears gates along
- * the route rather than only reacting after the bot gets stuck.
- *
- * Returns true if a qualifying gate was found and an Open interaction was queued.
- */
+/** Prefer a barrier in the requested direction; failed ones expire after cooldown. */
 export function openGateToward(player: Player, destX: number, destZ: number, radius = 10): boolean {
+    if (pollObstacle(player)) return true;
     const dx = destX - player.x;
     const dz = destZ - player.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    const dist = Math.hypot(dx, dz);
     if (dist < 1) return false;
-
-    const headX = dx / dist;
-    const headZ = dz / dist;
-    // Cap scan radius at (dist + 2) so we don't open gates beyond the destination.
-    const scanRadius = Math.min(radius, dist + 2);
-
-    const gate = _findLoc(player.x, player.z, player.level, scanRadius, loc => {
-        if (!_isClosedGate(loc)) return false;
-        // Directional filter: gate must be in the forward hemisphere (dot > 0).
-        const dot = (loc.x - player.x) * headX + (loc.z - player.z) * headZ;
-        return dot > 0;
+    const gate = _findLoc(player.x, player.z, player.level, Math.min(radius, dist + 2), loc => {
+        return gateOp(loc) !== null && !isObstacleSuppressed(player, loc) &&
+            (loc.x - player.x) * dx + (loc.z - player.z) * dz > 0;
     });
-
-    if (!gate) return false;
-
-    if (isAdjacentToLoc(player, gate)) {
-        // Adjacent — fire the OPLOC1 script directly (same fix as openNearbyGate).
-        if (_executeGateScript(player, gate)) return true;
-        interactLoc(player, gate as any);
-        return true;
-    }
-
-    // Not adjacent — walk toward the gate tile with plain waypoints.
-    _walkToGate(player, gate);
-    return true;
+    return gate ? _interactObstacle(player, gate, gateOp(gate)!) : false;
 }

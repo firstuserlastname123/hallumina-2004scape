@@ -7,6 +7,7 @@ export class BotRouteRetry {
     private target: { x: number; z: number; level: number } | null = null;
     private requested: { x: number; z: number; level: number; distance: number } | null = null;
     private bestDistance = Infinity;
+    private intermediate: { x: number; z: number; level: number; best: number } | null = null;
     private retryAt = 0;
     private progressTick = 0;
     failures = 0;
@@ -20,6 +21,7 @@ export class BotRouteRetry {
         if (changed) {
             if (!this.target && this.failures === 0) this.progressTick = tick;
             this.target = { x: destX, z: destZ, level: destLevel };
+            this.intermediate = null;
             this.bestDistance = this.distance(x, z, level);
         }
         this.destination = `${destX},${destZ},${destLevel}`;
@@ -36,6 +38,16 @@ export class BotRouteRetry {
 
     private noteProgress(x: number, z: number, level: number, tick: number): void {
         if (!this.target) return;
+        if (this.intermediate) {
+            const via = this.intermediate;
+            const distance = via.level === level ? Math.max(Math.abs(x - via.x), Math.abs(z - via.z)) : Infinity;
+            // Only actual travel toward a planned gateway extends the stall
+            // deadline. Choosing a new waypoint never replenishes retries.
+            if (distance < via.best - 2 || (distance === 0 && via.best > 0)) {
+                via.best = distance;
+                this.progressTick = tick;
+            }
+        }
         const distance = this.distance(x, z, level);
         // A short successful trip within the jitter radius is still progress.
         // Consume that arrival once; merely requesting the current tile is not one.
@@ -49,6 +61,16 @@ export class BotRouteRetry {
             this.progressTick = tick;
         }
     }
+
+    /** A known gateway on the route, never a random compass fallback. */
+    setIntermediate(x: number, z: number, level: number, srcX: number, srcZ: number, srcLevel: number): void {
+        if (this.intermediate?.x === x && this.intermediate.z === z && this.intermediate.level === level) return;
+        this.intermediate = { x, z, level,
+            best: srcLevel === level ? Math.max(Math.abs(srcX - x), Math.abs(srcZ - z)) : Infinity };
+    }
+
+    clearIntermediate(): void { this.intermediate = null; }
+    get intermediateTarget(): Readonly<{ x: number; z: number; level: number }> | null { return this.intermediate; }
 
     private distance(x: number, z: number, level: number): number {
         return this.target?.level === level ? Math.max(Math.abs(x - this.target.x), Math.abs(z - this.target.z)) : Infinity;
@@ -70,6 +92,7 @@ export class BotRouteRetry {
         this.target = null;
         this.requested = null;
         this.bestDistance = Infinity;
+        this.intermediate = null;
         this.retryAt = 0;
         this.failures = 0;
         this.progressTick = 0;

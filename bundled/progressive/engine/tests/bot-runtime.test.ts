@@ -24,3 +24,4 @@ function runtimeFixture(fixture: string, t: TestContext): void {
 
 test('navigation and task recovery against the real r254 engine and map', t => runtimeFixture('bot-runtime.ts', t));
 test('destination jitter, dynamic routes and bounded subtask recovery', t => runtimeFixture('bot-navigation-review.ts', t));
+test('doors, locked barriers, stairs, resources and social destinations on the r254 map', t => runtimeFixture('bot-environment.ts', t));
