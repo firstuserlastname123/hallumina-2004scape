@@ -42,6 +42,7 @@ import ScriptFile from '#/engine/script/ScriptFile.js';
 import ScriptPointer from '#/engine/script/ScriptPointer.js';
 import ScriptProvider from '#/engine/script/ScriptProvider.js';
 import ScriptRunner from '#/engine/script/ScriptRunner.js';
+import { STANDARD_SAVE_VERSION } from '#/server/login/PlayerSave.js';
 import ScriptState from '#/engine/script/ScriptState.js';
 import ServerTriggerType from '#/engine/script/ServerTriggerType.js';
 import World from '#/engine/World.js';
@@ -286,7 +287,8 @@ export default class Player extends PathingEntity {
     save() {
         const sav = Packet.alloc(2);
         sav.p2(PlayerLoading.SAV_MAGIC); // magic
-        sav.p2(PlayerLoading.SAV_VERSION); // version
+        const pendingBotTutorial = this.is_bot && this.botTutorialPending;
+        sav.p2(pendingBotTutorial ? PlayerLoading.SAV_VERSION : STANDARD_SAVE_VERSION);
 
         sav.p2(this.x);
         sav.p2(this.z);
@@ -366,6 +368,7 @@ export default class Player extends PathingEntity {
         // last login info
         sav.p8(this.lastLoginTime);
 
+        if (pendingBotTutorial) sav.p1(1);
         sav.p4(Packet.getcrc(sav.data, 0, sav.pos));
         return sav.data.subarray(0, sav.pos);
     }
@@ -391,6 +394,8 @@ export default class Player extends PathingEntity {
     lastRunEnergy: number = -1;
     runweight: number = 0;
     playtime: number = 0;
+    /** Set by configured bot admission and saved until native tutorial completion. */
+    botTutorialPending = false;
     stats: Int32Array = new Int32Array(21);
     levels: Uint8Array = new Uint8Array(21);
     vars: Int32Array;

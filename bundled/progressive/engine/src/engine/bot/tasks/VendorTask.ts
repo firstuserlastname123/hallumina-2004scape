@@ -203,7 +203,7 @@ export class VendorTask extends BotTask {
     private readonly stuck = new StuckDetector(10, 2, 1);
     private readonly watchdog = new ProgressWatchdog();
 
-    constructor() {
+    constructor(private readonly provision: boolean = true) {
         super('Vendor');
     }
 
@@ -273,19 +273,15 @@ export class VendorTask extends BotTask {
     // ── States ────────────────────────────────────────────────────────────────
 
     private handleInit(player: Player): void {
-        // Clear any previous stock from inventory.
         const inv = player.getInventory(InvType.INV);
-        if (inv) {
-            for (let slot = 0; slot < inv.capacity; slot++) {
-                const item = inv.get(slot);
-                if (!item) continue;
-                if (item.id === Items.COINS) continue;
-                inv.remove(item.id, item.count);
-            }
+        const heldStock = VENDOR_ITEMS.find(item => inv?.contains(this._tradeItemId(item)));
+        if (!this.provision && !heldStock) {
+            this.cooldown = 30;
+            return;
         }
 
         // Top up coins to 500M so the vendor always has buying power.
-        if (inv) {
+        if (this.provision && inv) {
             const existingCoins = countItem(player, Items.COINS);
             if (existingCoins < STARTING_VENDOR_COINS) {
                 inv.add(Items.COINS, STARTING_VENDOR_COINS - existingCoins);
@@ -293,19 +289,18 @@ export class VendorTask extends BotTask {
         }
 
         // Pick a random stock item and give it to the bot.
-        const picked = VENDOR_ITEMS[Math.floor(Math.random() * VENDOR_ITEMS.length)];
+        const picked = heldStock ?? VENDOR_ITEMS[Math.floor(Math.random() * VENDOR_ITEMS.length)];
         const pickedTradeId = this._tradeItemId(picked);
         const pickedObj = ObjType.get(pickedTradeId);
         this.stock = picked;
-        this.itemCount = pickedObj?.stackable ? randInt(5000, 8000) : 1;
+        if (!heldStock && inv) {
+            inv.add(pickedTradeId, pickedObj?.stackable ? randInt(5000, 8000) : 1);
+        }
+        this.itemCount = inv?.getItemCount(pickedTradeId) ?? 0;
         this.stockMax = this.itemCount;
         player.botVendorStockItemId = pickedTradeId;
         player.botVendorStockName = picked.name;
         player.botVendorStockNoted = this._isNotedStock(picked);
-
-        if (inv) {
-            inv.add(pickedTradeId, this.itemCount);
-        }
 
         BotLog.debug(`[VendorTask] ${player.displayName} stocking ${this.itemCount}x ${this._stockOfferName(picked)} @ ${picked.priceEach}gp ea`);
 

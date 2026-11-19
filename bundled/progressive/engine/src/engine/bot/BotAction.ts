@@ -1887,7 +1887,7 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
 
     // Toggle persistent run based on current energy.
     // Enable at 30 % (3 000/10 000); disable below 30 % so energy recovers.
-    // runanim must be non-(-1) for this to take effect — set in BotAppearance.randomize.
+    // The native appearance script initializes runanim at login.
     player.run = player.runenergy >= 3000 ? 1 : 0;
 
     player.moveSpeed = MoveSpeed.WALK; // guard against INSTANT; processMovement overrides via defaultMoveSpeed()

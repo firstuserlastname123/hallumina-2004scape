@@ -23,7 +23,12 @@ const ServerOps: CommandHandlers = {
     },
 
     [ScriptOpcode.MAP_LIVE]: state => {
-        state.pushInt(Environment.NODE_PRODUCTION ? 1 : 0);
+        const player = state._activePlayer;
+        // Enable the native skip choice only at the opening Guide dialogue
+        // for an enrolled bot. All other scripts use the configured map_live.
+        const botTutorialSkip = state.script.name === '[label,newbie_basics_instructor_welcome]' &&
+            state.self === player && player?.is_bot && player.botTutorialPending;
+        state.pushInt(Environment.NODE_PRODUCTION && !botTutorialSkip ? 1 : 0);
     },
 
     // custom: runtime toggle for optional content packs.

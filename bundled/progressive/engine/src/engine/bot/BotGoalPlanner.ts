@@ -202,6 +202,21 @@ const NEARBY_SHOPS = new Set(['BOB_AXES', 'LUMBRIDGE_GENERAL', 'AL_KHARID_SCIMIT
 export class BotGoalPlanner {
     readonly personality: BotPersonality;
     private initialised = false;
+    protected usesNativeStarterKit = false;
+    protected freshProfile = false;
+
+    useNativeStarterKit(): void {
+        this.usesNativeStarterKit = true;
+        this.initialised = true;
+    }
+
+    enableFreshProfile(): void {
+        this.freshProfile = true;
+    }
+
+    protected get canProvisionProfile(): boolean {
+        return !this.usesNativeStarterKit || this.freshProfile;
+    }
     // Counts pickTask calls remaining before bankstand is eligible again.
     // Initialised with a random offset so bots don't all bankstand at once.
     private bankstandCooldown = Math.floor(Math.random() * 20) + 10;
@@ -1100,7 +1115,7 @@ export class AgilityTestGoalPlanner extends BotGoalPlanner {
     }
 
     override pickTask(player: Player): BotTask | null {
-        if (!this.seededStats) {
+        if (!this.seededStats && this.canProvisionProfile) {
             this.seededStats = true;
             if (getBaseLevel(player, PlayerStat.AGILITY) < 35) {
                 player.setLevel(PlayerStat.AGILITY, 35);
@@ -1110,7 +1125,7 @@ export class AgilityTestGoalPlanner extends BotGoalPlanner {
             }
         }
 
-        if (!this.started) {
+        if (!this.started && !this.usesNativeStarterKit) {
             this.started = true;
             return new InitTask([]);
         }
@@ -1132,7 +1147,6 @@ export type ExtrasType = 'social' | 'vendor' | 'pker' | 'edgeville_pker';
  */
 export class ExtrasGoalPlanner extends BotGoalPlanner {
     private readonly extrasType: ExtrasType;
-    private extrasInit = false;
 
     constructor(type: ExtrasType) {
         super({ name: `Extras-${type}`, weights: {} });
@@ -1140,15 +1154,13 @@ export class ExtrasGoalPlanner extends BotGoalPlanner {
     }
 
     override pickTask(_player: Player): BotTask | null {
-        if (!this.extrasInit) {
-            this.extrasInit = true;
-            // Extras bots skip the normal InitTask — their tasks self-initialise.
-        }
+        const provision = this.canProvisionProfile;
+        this.freshProfile = false;
         switch (this.extrasType) {
             case 'social':         return new SocialTask();
-            case 'vendor':         return new VendorTask();
-            case 'pker':           return new PKerTask();
-            case 'edgeville_pker': return new EdgevillePKerTask();
+            case 'vendor':         return new VendorTask(provision);
+            case 'pker':           return new PKerTask(provision);
+            case 'edgeville_pker': return new EdgevillePKerTask(provision);
         }
     }
 }

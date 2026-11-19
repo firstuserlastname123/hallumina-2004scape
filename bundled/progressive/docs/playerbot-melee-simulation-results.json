@@ -273,5 +273,166 @@
         }
       }
     }
+  },
+  "nativeTutorial": {
+    "previousPrHead": "c735d41bcf449771b31c5d7c333fd066208435c7",
+    "runs": {
+      "254": {
+        "followup": {
+          "tutorialCompletions": 0,
+          "melee": {
+            "damagingEngagements": 239,
+            "kills": 201,
+            "nativeXp": 3696,
+            "taskXp": 0,
+            "emptySearches": 165,
+            "travelProgress": 3941,
+            "deferrals": 73,
+            "unreachable": 62,
+            "noAttack": 0
+          },
+          "progressionBotsWithNativeXp": 51,
+          "nativeXpProgressionBots": 11904.2,
+          "nativeXpEdgevilleSpecialists": 69797.2,
+          "nativeXpAllBots": 81701.4,
+          "navigationNoProgress": 6,
+          "pathFailures": 69,
+          "walkingStuck": 144,
+          "navigationOscillations": 2,
+          "allTaskDeferrals": 345,
+          "emittedTutorialBoundaryDeferrals": 44,
+          "active": 100,
+          "verifiedSaves": 100,
+          "sqliteIntegrity": {
+            "quick_check": "ok"
+          },
+          "botErrors": 0
+        },
+        "tutorial-final": {
+          "tutorialCompletions": 100,
+          "melee": {
+            "damagingEngagements": 324,
+            "kills": 270,
+            "nativeXp": 4644,
+            "taskXp": 0,
+            "emptySearches": 237,
+            "travelProgress": 5839,
+            "deferrals": 48,
+            "unreachable": 116,
+            "noAttack": 0
+          },
+          "progressionBotsWithNativeXp": 51,
+          "nativeXpProgressionBots": 17796.7,
+          "nativeXpEdgevilleSpecialists": 9714.0,
+          "nativeXpAllBots": 27510.7,
+          "navigationNoProgress": 5,
+          "pathFailures": 91,
+          "walkingStuck": 169,
+          "navigationOscillations": 9,
+          "allTaskDeferrals": 232,
+          "emittedTutorialBoundaryDeferrals": 0,
+          "active": 100,
+          "verifiedSaves": 100,
+          "sqliteIntegrity": {
+            "quick_check": "ok"
+          },
+          "botErrors": 0,
+          "sourceFingerprints": {
+            "src/engine/bot/BotTutorial.ts": "ba1ee674c1d7da7e63beedf2b13ddb662fd4311947978b1e44e8d095cc6d345c",
+            "src/engine/bot/BotAction.ts": "df69c297899cc8e6110c51ae8adc595567faf222965182aded74d45f35be8a88",
+            "src/engine/bot/BotAppearance.ts": "8a11c302e86f6680b48aa09e703d8842c1c86dda57b2d2e6419623368eb8242b",
+            "src/engine/bot/BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+            "src/engine/bot/BotManager.ts": "f19ad5a71e448dca7804edb7f646f399d87d8514f2a5f895f8dfc169b5bcd33d",
+            "src/engine/bot/BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+            "src/engine/bot/BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+            "src/engine/bot/tasks/EdgevillePKerTask.ts": "e9621fd2b5b950194220eb4b5acb5a460cb7d2d7b9cca6297d8a20dbb4dceae8",
+            "src/engine/bot/tasks/PKerTask.ts": "87adc64b88ea336c86622c96ac76f87d2c2fb218753129aef6dd15d575ff156c",
+            "src/engine/bot/tasks/VendorTask.ts": "d59f14110ed6087784c0d3698f09f010956772b718b6c53b03c9ab3bd2374732",
+            "src/engine/entity/Player.ts": "0e5626694fed7af46d727bf96d6e8aaf73a9fb5004500deb53380db6d0431c23",
+            "src/engine/entity/PlayerLoading.ts": "b7f1a7eb48cecb48ba7a8aa22d425f39ad6c542ee3eed95cc2c3ca86ac567e24",
+            "src/engine/script/handlers/ServerOps.ts": "4a5a891d32584ea071bb27cd1a3148614dd35c189a170bee416e902a66c7a0fe",
+            "src/server/login/PlayerSave.ts": "a3cb40d1b837bc3a65b3f9ddbabe0b91be9d4c9fdbbb207bbd13468f06191557"
+          }
+        }
+      },
+      "255": {
+        "followup": {
+          "tutorialCompletions": 0,
+          "melee": {
+            "damagingEngagements": 159,
+            "kills": 121,
+            "nativeXp": 2528,
+            "taskXp": 0,
+            "emptySearches": 107,
+            "travelProgress": 4456,
+            "deferrals": 61,
+            "unreachable": 59,
+            "noAttack": 0
+          },
+          "progressionBotsWithNativeXp": 51,
+          "nativeXpProgressionBots": 8460.7,
+          "nativeXpEdgevilleSpecialists": 17332.7,
+          "nativeXpAllBots": 25793.4,
+          "navigationNoProgress": 5,
+          "pathFailures": 67,
+          "walkingStuck": 103,
+          "navigationOscillations": 0,
+          "allTaskDeferrals": 341,
+          "emittedTutorialBoundaryDeferrals": 45,
+          "active": 100,
+          "verifiedSaves": 100,
+          "sqliteIntegrity": {
+            "quick_check": "ok"
+          },
+          "botErrors": 0
+        },
+        "tutorial-final": {
+          "tutorialCompletions": 100,
+          "melee": {
+            "damagingEngagements": 314,
+            "kills": 259,
+            "nativeXp": 4588,
+            "taskXp": 0,
+            "emptySearches": 348,
+            "travelProgress": 4990,
+            "deferrals": 59,
+            "unreachable": 81,
+            "noAttack": 2
+          },
+          "progressionBotsWithNativeXp": 52,
+          "nativeXpProgressionBots": 18591.1,
+          "nativeXpEdgevilleSpecialists": 23195.6,
+          "nativeXpAllBots": 41786.7,
+          "navigationNoProgress": 5,
+          "pathFailures": 20,
+          "walkingStuck": 102,
+          "navigationOscillations": 21,
+          "allTaskDeferrals": 194,
+          "emittedTutorialBoundaryDeferrals": 0,
+          "active": 100,
+          "verifiedSaves": 100,
+          "sqliteIntegrity": {
+            "quick_check": "ok"
+          },
+          "botErrors": 0,
+          "sourceFingerprints": {
+            "src/engine/bot/BotTutorial.ts": "ba1ee674c1d7da7e63beedf2b13ddb662fd4311947978b1e44e8d095cc6d345c",
+            "src/engine/bot/BotAction.ts": "df69c297899cc8e6110c51ae8adc595567faf222965182aded74d45f35be8a88",
+            "src/engine/bot/BotAppearance.ts": "8a11c302e86f6680b48aa09e703d8842c1c86dda57b2d2e6419623368eb8242b",
+            "src/engine/bot/BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+            "src/engine/bot/BotManager.ts": "f19ad5a71e448dca7804edb7f646f399d87d8514f2a5f895f8dfc169b5bcd33d",
+            "src/engine/bot/BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+            "src/engine/bot/BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+            "src/engine/bot/tasks/EdgevillePKerTask.ts": "e9621fd2b5b950194220eb4b5acb5a460cb7d2d7b9cca6297d8a20dbb4dceae8",
+            "src/engine/bot/tasks/PKerTask.ts": "87adc64b88ea336c86622c96ac76f87d2c2fb218753129aef6dd15d575ff156c",
+            "src/engine/bot/tasks/VendorTask.ts": "d59f14110ed6087784c0d3698f09f010956772b718b6c53b03c9ab3bd2374732",
+            "src/engine/entity/Player.ts": "0e5626694fed7af46d727bf96d6e8aaf73a9fb5004500deb53380db6d0431c23",
+            "src/engine/entity/PlayerLoading.ts": "b7f1a7eb48cecb48ba7a8aa22d425f39ad6c542ee3eed95cc2c3ca86ac567e24",
+            "src/engine/script/handlers/ServerOps.ts": "4a5a891d32584ea071bb27cd1a3148614dd35c189a170bee416e902a66c7a0fe",
+            "src/server/login/PlayerSave.ts": "a3cb40d1b837bc3a65b3f9ddbabe0b91be9d4c9fdbbb207bbd13468f06191557"
+          }
+        }
+      }
+    }
   }
 }

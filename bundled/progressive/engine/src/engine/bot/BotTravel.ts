@@ -92,7 +92,7 @@ export function onKaramja(x: number, z: number): boolean {
     return isInside(KARAMJA_POLYGON, x, z);
 }
 /** Bounds from the native RuneScript in_tutorial_island predicate, including its mine. */
-function onTutorialIsland(x: number, z: number): boolean {
+export function onTutorialIsland(x: number, z: number): boolean {
     return (x >= 3053 && x <= 3156 && z >= 3056 && z <= 3136) ||
         (x >= 3072 && x <= 3118 && z >= 9492 && z <= 9535);
 }

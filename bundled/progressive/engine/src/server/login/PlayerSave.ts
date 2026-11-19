@@ -4,7 +4,9 @@ import path from 'node:path';
 import Packet from '#/io/Packet.js';
 
 export const SAV_MAGIC = 0x2004;
-export const SAV_VERSION = 7;
+// Only an in-progress bot tutorial needs the extra version-8 byte.
+export const STANDARD_SAVE_VERSION = 7;
+export const SAV_VERSION = 8;
 
 // Shared with PlayerLoading without importing World (which starts workers).
 export function verifyPlayerSave(sav: Packet): boolean {

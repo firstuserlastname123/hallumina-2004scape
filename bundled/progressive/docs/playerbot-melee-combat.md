@@ -89,3 +89,43 @@ The follow-up used the same seed 254 and 255 setups, 100 bots and 2,000 ticks pe
 | Task-awarded melee XP | 0 | 0 | 0 | 0 |
 
 The follow-up replaces the island stalls with explicit route refusals. It does not establish a mainland route for characters that start on Tutorial Island. Total task deferrals rose from 307 to 686 across the two seeds, including repeated crafting and activity-watchdog failures. These runs do not attribute the full increase to the island guard. Eleven mainland no-progress events still occurred. [Machine-readable results](playerbot-melee-simulation-results.json)
+
+## Fresh playerbot tutorial onboarding
+
+The assembled Progressive 254 copies of the Guide and tutorial scripts match the upstream revision after normalizing line endings. The Guide offers “Yes please.” at the opening welcome only when `map_live` is false. The engine resolves `map_live` from `NODE_PRODUCTION`. The disposable assembly has no local `.env` setting for it, so validation explicitly enabled `NODE_PRODUCTION=true` as documented for live deployments. The bot-only exception applies to the Guide's welcome label and the enrolled bot executing it. Production mode and the result of `map_live` in other scripts follow the existing configuration. The production human fixture uses the same design and NPC handlers and reaches the normal next tutorial step. [Upstream Guide](https://github.com/LostCityRS/Content/blob/254/scripts/tutorial/scripts/guides/runescape_guide.rs2) · [Upstream tutorial](https://github.com/LostCityRS/Content/blob/254/scripts/tutorial/scripts/tutorial.rs2)
+
+The bot submits a validated appearance and clicks the native design Accept button. Native tutorial scripts advance the design checkpoint. The bot then uses an ordinary Talk-to interaction with the RuneScape Guide and chooses the matching response through the registered dialogue buttons. The native completion script moves the bot to (3222,3222), grants the standard inventory, and opens the regular tabs. Managed progression bots use those supplies and start their configured activity planner after arrival. Fresh specialist profiles may provision their configured role after arrival. Saved specialist profiles use their existing stats and supplies at startup.
+
+Only a missing save enrolls a bot for this flow. A pending enrollment can resume from a save carrying the bot-only version 8 marker. The marker is written with the normal save and checksum, so a shutdown after design can resume the Guide dialogue. The completed native tutorial varp persists in the standard version 7 save. A pending bot with evidence of progression is held for normal tutorial completion, as are unenrolled legacy island saves. Existing mainland characters enter ordinary activity with their saved profile. Empty, damaged, or unreadable save files block that configured bot from spawning so operators can recover the file. This flow uses the existing account and save storage, including SQLite.
+
+All 39 bot, persistence and r254 integrity tests passed. Run the tutorial lifecycle fixture from a packed r254 assembly to exercise fresh arrival, native starter supplies, planner gating, established mainland and island characters, production human dialogue, and the restart of completed and unfinished bots.
+
+```sh
+node --import tsx --test --test-name-pattern 'configured fresh bots' tests/persistence-runtime.test.ts
+```
+
+The first seed-255 attempt exposed a specialist gear error after native starter gear changed the inventory layout. A failed weapon switch could still send the special-attack button to the server. Both PK profiles now use the native equipment operation, verify that the intended weapon is worn before activating its special, and let the equipment script handle displaced gear. The tutorial fixture also checks a special-weapon switch refused by the native requirements.
+
+### Population rerun after native onboarding
+
+The comparison uses the prior PR head `c735d41` and the same disposable 100-bot setup for 2,000 ticks per seed. Both updated runs recorded 100 native tutorial completions. Each ended with 100 active bots, 100 verified saves, SQLite quick-check OK and zero bot errors.
+
+| Observation | Before 254 | Native tutorial 254 | Before 255 | Native tutorial 255 |
+| --- | ---: | ---: | ---: | ---: |
+| Native Tutorial Island completions | 0 | 100 | 0 | 100 |
+| Progression bots earning native XP, out of 52 | 51 | 51 | 51 | 52 |
+| Damaging melee engagements | 239 | 324 | 159 | 314 |
+| Native hero-credited NPC kills | 201 | 270 | 121 | 259 |
+| Native melee XP | 3,696 | 4,644 | 2,528 | 4,588 |
+| Task-awarded melee XP | 0 | 0 | 0 | 0 |
+| Combat approach timeouts | 62 | 116 | 59 | 81 |
+| Navigation no-progress events | 6 | 5 | 5 | 5 |
+| Navigation path failures | 69 | 91 | 67 | 20 |
+| Navigation oscillations | 2 | 9 | 0 | 21 |
+| Combat deferrals | 73 | 48 | 61 | 59 |
+| All task deferrals | 345 | 232 | 341 | 194 |
+| Emitted unsupported tutorial crossing deferrals | 44 | 0 | 45 | 0 |
+| Native XP across progression bots | 11,904.2 | 17,796.7 | 8,460.7 | 18,591.1 |
+| Native XP across Edgeville PK specialists | 69,797.2 | 9,714.0 | 17,332.7 | 23,195.6 |
+
+Across both seeds, progression-bot native XP increased from 20,364.9 to 36,387.8. Population-wide native XP fell from 107,494.8 to 69,297.4, with the decline concentrated among the Edgeville specialists in seed 254. Combat approach timeouts and oscillations rose even as kills increased and overall deferrals fell. Different native starting supplies and choices change the runs' trajectories. These disposable runs measure behavior on the assembled r254 map under accelerated timing. [Per-seed results and source fingerprints](playerbot-melee-simulation-results.json)

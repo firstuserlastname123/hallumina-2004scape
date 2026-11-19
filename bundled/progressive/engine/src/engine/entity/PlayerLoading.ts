@@ -170,6 +170,12 @@ export class PlayerLoading {
             player.lastLoginTime = sav.g8();
         }
 
+        if (version >= 8) {
+            if (sav.pos + 1 !== sav.data.length - 4 || sav.g1() !== 1) {
+                throw new Error('Invalid bot tutorial marker');
+            }
+            player.botTutorialPending = client === null;
+        }
         player.combatLevel = player.getCombatLevel();
 
         return player;

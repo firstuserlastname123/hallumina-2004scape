@@ -6,6 +6,7 @@
 
 import fs from 'fs';
 import { attachBotDialogue, answerBotDialogue } from '#/engine/bot/BotDialogue.js';
+import type { BotTutorial } from '#/engine/bot/BotTutorial.js';
 import { tickTravel } from '#/engine/bot/BotTravel.js';
 import { pendingGnomeGate } from '#/engine/bot/BotObstacles.js';
 import path from 'path';
@@ -97,7 +98,7 @@ export class BotPlayer {
     //   anim(human_castteleport) → p_delay(2) → p_telejump → anim(null)
     private pendingTeleport: { x: number; z: number; level: number } | null = null;
 
-    constructor(player: Player, planner: BotGoalPlanner) {
+    constructor(player: Player, planner: BotGoalPlanner, private readonly tutorial?: BotTutorial) {
         this.player = player;
         this.planner = planner;
         this.name = player.username;
@@ -221,6 +222,7 @@ export class BotPlayer {
     private _tick(): void {
         this.ticksAlive++;
         this.player.afkEventReady = false;
+        if (this.tutorial?.tick(this.player, this.planner)) return;
         if (this.subTask && this.currentTask?.interrupted) this.deferSubTask(this.subTask, 'parent task interrupted', 200);
 
         try {

@@ -25,22 +25,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-import Player, { getExpByLevel } from '#/engine/entity/Player.js';
-import { PlayerStat } from '#/engine/bot/BotAction.js';
 import { BotPlayer } from '#/engine/bot/BotPlayer.js';
 import { setWorld, BotWorldHandle } from '#/engine/bot/BotWorld.js';
 import { ensureBotAccount } from '#/engine/bot/BotDatabase.js';
 import { BotGoalPlanner, makeSkiller, makeFighter, makeBalanced, makeRandom, makeAgilityTester, makeExtrasSocial, makeExtrasVendor, makeExtrasPKer, makeExtrasEdgevillePKer } from '#/engine/bot/BotGoalPlanner.js';
 import { PlayerLoading } from '#/engine/entity/PlayerLoading.js';
 import Packet from '#/io/Packet.js';
-import { Locations } from '#/engine/bot/BotKnowledge.js';
-import { isMapBlocked, isZoneAllocated } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
-import { BotAppearance } from '#/engine/bot/BotAppearance.js';
-import InvType from '#/cache/config/InvType.js';
+import { BotTutorial, needsBotTutorial } from '#/engine/bot/BotTutorial.js';
 import Environment from '#/util/Environment.js';
 import { toBase37, fromBase37 } from '#/util/JString.js';
-import { ChatModePrivate } from '#/engine/entity/ChatModes.js';
 import { BotDebugService } from '#/engine/bot/debug/BotDebugService.js';
 import { BotLog, BOT_SUMMARY_TICKS, BOT_LOG_DETAILS } from '#/engine/bot/BotLog.js';
 import { BotTickMetrics } from '#/engine/bot/BotTickMetrics.js';
@@ -221,124 +215,39 @@ class BotManagerClass {
         const normalizedUsername = normalizeBotUsername(cfg.username);
         const profile = Environment.NODE_PROFILE ?? 'main';
 
-        let packet: Packet;
-        let saveExists = false;
-
+        const savePath = `data/players/${profile}/${normalizedUsername}.sav`;
+        let save: Uint8Array | undefined;
         try {
-            const savePath = `data/players/${profile}/${normalizedUsername}.sav`;
-            saveExists = fs.existsSync(savePath);
-
-            let save: Buffer;
-
-            if (fs.existsSync(savePath)) {
-                save = fs.readFileSync(savePath);
-
-                if (!save || save.length === 0) {
-                    save = Buffer.alloc(0);
-                }
-            } else {
-                save = Buffer.alloc(0);
+            save = fs.readFileSync(savePath);
+            if (save.length < 2) {
+                console.error(`[BotManager] Empty save for ${normalizedUsername}; skipping bot startup`);
+                return;
             }
-
-            packet = new Packet(save);
         } catch (err) {
-            console.error(`[BotManager] Failed loading save for ${normalizedUsername}:`, err);
-            packet = new Packet(new Uint8Array(0));
+            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+                console.error(`[BotManager] Could not read save for ${normalizedUsername}; skipping bot startup`, err);
+                return;
+            }
         }
 
-        let player: Player;
-
+        let player;
         try {
-            player = PlayerLoading.load(normalizedUsername, packet, null);
+            player = PlayerLoading.load(normalizedUsername, new Packet(save ?? new Uint8Array()), null);
         } catch (err) {
-            console.error(`[BotManager] Corrupt PlayerLoading data for ${normalizedUsername}, spawning fresh`, err);
-            player = PlayerLoading.load(normalizedUsername, new Packet(new Uint8Array(0)), null);
+            console.error(`[BotManager] Could not load save for ${normalizedUsername}; skipping bot startup`, err);
+            return;
         }
 
-        // ─────────────────────────────────────────────
-        // spawn fallback position
-        // ─────────────────────────────────────────────
-        const [x, z, l] = Locations.LUMBRIDGE_SPAWN;
-
-        // Scatter new bots (no saved position) across walkable tiles near spawn.
-        // Each candidate is validated against the collision map so bots never land
-        // in water, inside walls, or on any other blocked tile.
-        // Falls back to the exact spawn tile if all 20 attempts find no clear tile.
-        if (player.x == null || player.z == null) {
-            let spawnX = x;
-            let spawnZ = z;
-            for (let attempt = 0; attempt < 20; attempt++) {
-                const tx = x + Math.floor(Math.random() * 11) - 5;
-                const tz = z + Math.floor(Math.random() * 11) - 5;
-                if (isZoneAllocated(l, tx, tz) && !isMapBlocked(tx, tz, l)) {
-                    spawnX = tx;
-                    spawnZ = tz;
-                    break;
-                }
-            }
-            player.x = spawnX;
-            player.z = spawnZ;
-        }
-        player.level = player.level ?? l;
-        // prevent tutorial island logic from interfering
-        (player as any).inTutorialIsland = false;
-        (player as any).tutorialStage = 0;
-
-        // ─────────────────────────────────────────────
-        // ensure base stats
-        // ─────────────────────────────────────────────
-        if (!player.baseLevels || player.baseLevels.length !== 21) {
-            player.baseLevels = new Uint8Array(21);
-        }
-
-        // ─────────────────────────────────────────────
-        // 🔥 IMPORTANT: APPLY BOT APPEARANCE HERE
-        // Refresh body/clothes for every bot so old default-looking saves do not stay default.
-        // ─────────────────────────────────────────────
-        if (!saveExists) {
-            try {
-                BotAppearance.randomize(player);
-                BotLog.debug(`[BotManager] Randomized appearance for new bot: ${normalizedUsername}`);
-            } catch (err) {
-                console.error(`[BotManager] BotAppearance failed for ${normalizedUsername}:`, err);
-            }
-        } else {
-            try {
-                BotAppearance.randomizeBody(player);
-                BotLog.debug(`[BotManager] Refreshed appearance for existing bot: ${normalizedUsername}`);
-            } catch (err) {
-                console.error(`[BotManager] BotAppearance refresh failed for ${normalizedUsername}:`, err);
-            }
-        }
-
-        if (!saveExists) {
-            // Set Herblore to 3 (requires Druidic Ritual quest)
-            player.baseLevels[PlayerStat.HERBLORE] = 3;
-            player.stats[PlayerStat.HERBLORE] = getExpByLevel(3);
-        }
-        // Preserve loaded quest/access flags and leave new characters' defaults
-        // intact. Native game interactions must establish access; navigation
-        // must never manufacture completed quests or suppress their requirements.
-
-        // ─────────────────────────────────────────────
-        // store XP baseline  (key = player.username so _checkLevelUps lookup matches)
-        // ─────────────────────────────────────────────
-        this.prevLevels.set(normalizedUsername, new Uint8Array(player.baseLevels));
-
-        // ─────────────────────────────────────────────
-        // spawn bot
-        // ─────────────────────────────────────────────
-        const bot = new BotPlayer(player, cfg.makePlanner());
-        this.bots.set(normalizedUsername, bot);
-        player.is_bot = true; // mark as headless bot
+        player.is_bot = true;
         player.botPlanner = cfg.planner;
-        player.privateChat = ChatModePrivate.ON;
+        player.botTutorialPending ||= save === undefined;
+        const planner = cfg.makePlanner();
+        planner.useNativeStarterKit();
+        const tutorial = needsBotTutorial(player) ? new BotTutorial() : undefined;
+        const bot = new BotPlayer(player, planner, tutorial);
+        this.bots.set(normalizedUsername, bot);
+        this.prevLevels.set(normalizedUsername, new Uint8Array(player.baseLevels));
         this.world.newPlayers.add(player);
-
-        // ─────────────────────────────────────────────
-        // ensure client sees correct appearance
-        // ─────────────────────────────────────────────
-        player.buildAppearance(InvType.WORN);
 
         BotLog.debug(`[BotManager] Loaded bot: ${normalizedUsername}`);
 
