@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const mode = process.argv[2] ?? 'world';
-assert.ok(['world', 'edge', 'geared', 'decisions', 'travel', 'travel-fit', 'bank', 'agility'].includes(mode), 'Expected world, edge, geared, decisions, travel, travel-fit, bank or agility');
+assert.ok(['world', 'edge', 'geared', 'decisions', 'travel', 'travel-fit', 'bank', 'retreat', 'agility'].includes(mode), 'Expected world, edge, geared, decisions, travel, travel-fit, bank, retreat or agility');
 const engine = fileURLToPath(new URL('../../', import.meta.url));
 assert.ok(fs.existsSync(path.join(engine, 'data/pack/server/script.dat')), 'Assemble and pack progressive-254 first');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'r254-combat-'));
@@ -161,6 +161,28 @@ async function investigate() {
         report('risk', { at: guardStep.location, playerLevel: trainee.getCombatLevel(), hp: trainee.levels[3],
             requiredWeapon: guardStep.toolItemIds[0], canRun: guards.shouldRun(trainee),
             rejectedGuard: guard === null });
+        // With no travel progress, the retreat watchdog keeps its 30-tick bound.
+        const stuck = PlayerLoading.load('stuckretreat', new Packet(new Uint8Array()), null);
+        stuck.x = 3034; stuck.z = 3235; stuck.level = 0; stuck.slot = 3;
+        stuck.applyDamage(8, 1);
+        const stuckBot = new BotPlayer(stuck, new BotGoalPlanner());
+        const retreat = new CombatTask(edgeStep, PlayerStat.ATTACK);
+        stuckBot.currentTask = retreat;
+        retreat.tick(stuck);
+        assert.equal(retreat.getDebugInfo(stuck).state, 'flee');
+        // Deliberately leave the player stationary in the real collision map.
+        for (let i = 0; i < 29; i++) {
+            World.currentTick++;
+            stuck.playtime++;
+            retreat.tick(stuck);
+            assert.equal(retreat.interrupted, false);
+        }
+        World.currentTick++;
+        stuck.playtime++;
+        retreat.tick(stuck);
+        assert.equal(retreat.interrupted, true);
+        assert.deepEqual([stuck.x, stuck.z], [3034, 3235]);
+        assert.equal(stuckBot.navigation.meaningfulTravelSerial, 0);
         return;
     }
 
@@ -228,6 +250,14 @@ async function investigate() {
         p.getInventory(InvType.INV)!.add(Items.BONES, 1);
         p.getInventory(bankInvId())!.add(Items.SHRIMP, 6);
     }
+    const retreatOrigin = [3034, 3235];
+    if (mode === 'retreat') {
+        [p.x, p.z] = retreatOrigin;
+        p.applyDamage(8, 1);
+        p.getInventory(bankInvId())!.add(Items.SHRIMP, 6);
+    }
+    let arrivedWithSupplies = false;
+    let ticksWalking = 0;
     const { totalCostOfMissing, getMissingPurchases } = await import('#/engine/bot/BotNeeds.js');
     let gearedTicks = 0;
     let ateShrimp = false;
@@ -292,10 +322,22 @@ async function investigate() {
     // World.cycle schedules its successor. Drive precisely one native cycle per iteration.
     World.cycle = () => {};
     World.tickRate = 0;
-    for (let i = 0; i < (mode === 'bank' ? 40 : 200) && !task.interrupted && b.currentTask === task; i++) {
+    for (let i = 0; i < (mode === 'bank' ? 40 : mode === 'retreat' ? 250 : 200) && !task.interrupted && b.currentTask === task; i++) {
         if (i === 20) World.newPlayers.add(p);
         const before = World.currentTick;
+        const x = p.x, z = p.z;
         cycle();
+        if (mode === 'retreat') {
+            const distance = Math.max(Math.abs(p.x - x), Math.abs(p.z - z));
+            assert.ok(distance <= 2, 'bank travel used ordinary steps');
+            if (distance > 0) ticksWalking++;
+            if (p.getInventory(InvType.INV)!.getItemCount(Items.SHRIMP) === 6) {
+                assert.ok(Math.max(Math.abs(p.x - Locations.DRAYNOR_BANK[0]), Math.abs(p.z - Locations.DRAYNOR_BANK[1])) <= 5);
+                assert.equal(p.getInventory(bankInvId())!.getItemCount(Items.SHRIMP), 0);
+                arrivedWithSupplies = true;
+                break;
+            }
+        }
         // A native ground pickup can suspend and resume under a different script label.
         for (const [item, count] of drops) {
             const now = p.getInventory(InvType.INV)!.getItemCount(item);
@@ -329,6 +371,14 @@ async function investigate() {
         assert.equal(bank.getItemCount(Items.COINS), 71);
         assert.equal(bank.getItemCount(Items.BONES), 1);
         assert.equal(p.getInventory(InvType.INV)!.getItemCount(Items.SHRIMP), 6);
+    }
+    if (mode === 'retreat') {
+        report('retreatEnd', { origin: retreatOrigin, location: [p.x, p.z], ticksWalking, tick: World.currentTick,
+            progress: b.navigation.meaningfulTravelSerial, supplies: p.getInventory(InvType.INV)!.getItemCount(Items.SHRIMP) });
+        assert.equal(task.interrupted, false);
+        assert.equal(b.currentTask, task);
+        assert.ok(World.currentTick > 52 && ticksWalking > 20 && b.navigation.meaningfulTravelSerial > 0);
+        assert.ok(arrivedWithSupplies);
     }
     report('worldEnd', { tick: World.currentTick, xpInternal: xp, state: info(), events: BotLog.counts });
 }

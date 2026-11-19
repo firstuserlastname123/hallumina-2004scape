@@ -212,5 +212,66 @@
         "tasks/RangedMagicTask.ts": "974b6ab128a82512282d1925ce679623d7c993981b2d0a978f1ba143ceab70d1"
       }
     }
+  },
+  "navigationFollowUp": {
+    "previousPrHead": "48becf496feff7cbb49dc054da5fda5e63668a2e",
+    "runs": {
+      "254": {
+        "navigationNoProgress": 6,
+        "emittedTutorialNoProgress": 0,
+        "emittedTutorialBoundaryDeferrals": 44,
+        "allTaskDeferrals": 345,
+        "melee": {
+          "damagingEngagements": 239,
+          "kills": 201,
+          "nativeXp": 3696,
+          "taskXp": 0,
+          "emptySearches": 165,
+          "travelProgress": 3941,
+          "deferrals": 73,
+          "unreachable": 62,
+          "noAttack": 0
+        },
+        "active": 100,
+        "verifiedSaves": 100,
+        "sqliteIntegrity": {
+          "quick_check": "ok"
+        },
+        "botErrors": 0,
+        "sourceFingerprints": {
+          "BotTravel.ts": "b2bdde0a6b09ed610d8369d6bb16f29a929af692c9000dbcec6d5e0df7946c08",
+          "tasks/BotTaskBase.ts": "4fb407633dfece70a4d4f7416ac0e138a8bd58e9e8f77d613b6d4d04b935deb9",
+          "tasks/CombatTask.ts": "5f54f5e0b102ea43f42f08d5310b72bc818d01c1a3e167498a9084738a5b4bc8"
+        }
+      },
+      "255": {
+        "navigationNoProgress": 5,
+        "emittedTutorialNoProgress": 0,
+        "emittedTutorialBoundaryDeferrals": 45,
+        "allTaskDeferrals": 341,
+        "melee": {
+          "damagingEngagements": 159,
+          "kills": 121,
+          "nativeXp": 2528,
+          "taskXp": 0,
+          "emptySearches": 107,
+          "travelProgress": 4456,
+          "deferrals": 61,
+          "unreachable": 59,
+          "noAttack": 0
+        },
+        "active": 100,
+        "verifiedSaves": 100,
+        "sqliteIntegrity": {
+          "quick_check": "ok"
+        },
+        "botErrors": 0,
+        "sourceFingerprints": {
+          "BotTravel.ts": "b2bdde0a6b09ed610d8369d6bb16f29a929af692c9000dbcec6d5e0df7946c08",
+          "tasks/BotTaskBase.ts": "4fb407633dfece70a4d4f7416ac0e138a8bd58e9e8f77d613b6d4d04b935deb9",
+          "tasks/CombatTask.ts": "5f54f5e0b102ea43f42f08d5310b72bc818d01c1a3e167498a9084738a5b4bc8"
+        }
+      }
+    }
   }
 }

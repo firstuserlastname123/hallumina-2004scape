@@ -24,7 +24,6 @@ import {
     randInt,
     bankInvId,
     INTERACT_TIMEOUT,
-    StuckDetector,
     ProgressWatchdog,
     botJitter,
     advanceBankWalk,
@@ -119,7 +118,7 @@ export class CombatTask extends BotTask {
     private scanFail = 0;
     private blockedCandidate: Npc | null = null;
     private triedSaferArea = false;
-    private fleeTicks = 0;
+    private bankDestination: [number, number, number] | null = null;
 
     private lastBuryTime = Date.now();
     private readonly BURY_INTERVAL = 0.1 * 60 * 1000;
@@ -129,7 +128,7 @@ export class CombatTask extends BotTask {
     /** Key of the NPC this instance has claimed in CLAIMED_NPCS, or -1 if none. */
     private claimedNpcKey = -1;
 
-    private readonly stuck = new StuckDetector(30, 4, 2);
+    private readonly retreatWatchdog = new ProgressWatchdog(30);
     private readonly watchdog = new ProgressWatchdog(150);
 
     private hasFoughtInArea = false;
@@ -169,16 +168,14 @@ export class CombatTask extends BotTask {
 
         if (this.interrupted) return;
 
-        const banking = this.state === 'bank_walk' || this.state === 'bank_deposit';
-        if (this.watchdog.check(player, banking)) {
+        if (this.watchdog.check(player, this.state === 'flee' || this.state === 'bank_deposit')) {
             player.clearWaypoints();
             player.clearPendingAction();
             this._log(player, 'Combat deferred after inactivity', 'watchdog');
-            this.stuck.reset();
             this._releaseNpc();
             this.currentNpc = null;
             this.scanFail = 0;
-            this.fleeTicks = 0;
+            this.bankDestination = null;
             this.cooldown = 0;
             this.state = 'walk';
             return;
@@ -207,7 +204,7 @@ export class CombatTask extends BotTask {
              } else {
                  this._log(player, `HP low (${hp}/${maxHp}) and NO FOOD, fleeing!`, 'flee_low_hp');
                  this.state = 'flee';
-                 this.fleeTicks = 0;
+                 this.bankDestination = null;
                  return;
              }
         }
@@ -224,7 +221,7 @@ export class CombatTask extends BotTask {
                     this._releaseNpc();
                     this.currentNpc = null;
                     this.state = 'flee';
-                    this.fleeTicks = 0;
+                    this.bankDestination = null;
                     return;
                 }
             }
@@ -337,7 +334,8 @@ export class CombatTask extends BotTask {
 
         // ── BANK ──────────────────────────────────────
         if (this.state === 'bank_walk') {
-            const result = advanceBankWalk(player, this.stuck, undefined, false);
+            this.bankDestination ??= nearestBank(player);
+            const result = advanceBankWalk(player, null, this.bankDestination);
             if (result === 'direct') { this._defer(player, 'no accessible banker'); return; }
             if (result === 'walk') return;
             this.cooldown = result === 'ready' ? 3 : 0;
@@ -351,6 +349,8 @@ export class CombatTask extends BotTask {
                 return;
             }
             this._bankSupplies(player);
+            this.bankDestination = null;
+            this.watchdog.notifyActivity();
             player.closeModal();
             _equipLoot(player);
             this._rerollStep(player); // re-randomise location for the next run
@@ -421,13 +421,19 @@ export class CombatTask extends BotTask {
         // Leave the training area on foot to seek supplies.
         // walkTo automatically uses MoveSpeed.RUN when runenergy >= 30 %.
         if (this.state === 'flee') {
-            const [x, z, level] = nearestBank(player);
-            const nearBank = isNear(player, x, z, 4, level);
-            if (nearBank && FOOD_IDS.some(id => player.getInventory(bankInvId())?.contains(id))) {
-                this.state = 'bank_walk';
-            } else if (++this.fleeTicks > 30 || nearBank) {
-                this._defer(player, 'retreat to recover health or supplies');
-            } else {
+            if (!this.bankDestination) {
+                this.bankDestination = nearestBank(player);
+                this.retreatWatchdog.reset();
+            }
+            const [x, z, level] = this.bankDestination;
+            if (isNear(player, x, z, 4, level)) {
+                if (FOOD_IDS.some(id => player.getInventory(bankInvId())?.contains(id))) {
+                    this.watchdog.notifyActivity();
+                    this.state = 'bank_walk';
+                } else {
+                    this._defer(player, 'retreat to recover health or supplies');
+                }
+            } else if (!this.retreatWatchdog.check(player)) {
                 walkTo(player, x, z, level);
             }
             return;
@@ -598,8 +604,7 @@ export class CombatTask extends BotTask {
                 interactTicks: this.interactTicks,
                 approachTicks: this.approachTicks,
                 scanFail: this.scanFail,
-                fleeTicks: this.fleeTicks,
-                stuck: this.stuck.getDebugSnapshot()
+                bankDestination: this.bankDestination ?? undefined
             }
         };
     }
@@ -625,14 +630,14 @@ export class CombatTask extends BotTask {
         this.trainIndex = 0;
         this.stat = TRAIN_CYCLE[0].stat;
 
-        this.fleeTicks = 0;
+        this.bankDestination = null;
 
         this.hasFoughtInArea = false;
 
         this.lastBuryTime = 0; // expire immediately so timer-fallback fires on first tick with bones
         this.buryWaitTicks = 0;
 
-        this.stuck.reset();
+        this.retreatWatchdog.reset();
         this.watchdog.reset();
     }
 

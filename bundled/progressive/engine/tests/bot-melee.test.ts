@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const engine = fileURLToPath(new URL('../', import.meta.url));
-for (const mode of ['world', 'decisions', 'geared', 'travel-fit', 'bank']) {
+for (const mode of ['world', 'decisions', 'geared', 'travel-fit', 'bank', 'retreat']) {
     test('native r254 melee regression — ' + mode, () => {
         const result = spawnSync(process.execPath, ['--import', 'tsx', 'tools/bot/investigate-combat.ts', mode], {
             cwd: engine, encoding: 'utf8', timeout: 120_000

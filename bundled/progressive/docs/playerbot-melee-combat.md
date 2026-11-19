@@ -19,7 +19,7 @@ node --import tsx --test --test-concurrency=1 tests/bot-melee.test.ts tests/bot-
 node --import tsx --test --test-concurrency=1 tests/build-integrity.test.ts tests/persistence-runtime.test.ts
 ```
 
-For a tick trace, run `node --import tsx tools/bot/investigate-combat.ts world`. The other regression modes are `decisions`, `geared`, `travel-fit` and `bank`.
+For a tick trace, run `node --import tsx tools/bot/investigate-combat.ts world`. The other regression modes are `decisions`, `geared`, `travel-fit`, `bank` and `retreat`.
 
 | Fixture | Merged dev | PR #5 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ For a tick trace, run `node --import tsx tools/bot/investigate-combat.ts world`.
 
 [Baseline traces and secondary findings](playerbot-combat-investigation.md)
 
-## Paired population comparison
+## Paired population comparison before the navigation follow-up
 
 Each run used 100 configured bots, 2,000 full world ticks, seed 254 or 255, the same verified packs, 1× XP and an empty, disposable SQLite and save profile. Both checkouts ran the same simulation observer. All four runs finished with 100 active bots, 100 verified saves, SQLite quick-check OK and zero bot errors. The original 32 tests and five new melee tests passed. TypeScript still reports the 11 previously documented client protocol errors.
 
@@ -62,3 +62,30 @@ Across both seeds the bots recorded 261 kills versus 130, and gained 4,672 nativ
 These accelerated runs include existing wall-clock timers. Changed choices consume randomness in a different order. They give two paired observations of population participation. Long-term progression, manual gameplay and a restart in the user's latest live VM session still require live evidence. Agility accounting and character initialization remain follow-ups.
 
 To repeat the comparison, follow the disposable simulation setup for each checkout and seed, copy the same observer into both, and set `BOT_SIM_TICKS=2000`, `BOT_SIM_SEED=254` or `255` and `BOT_SIM_INTERVAL_MS=0`. [Simulation setup](playerbot-reliability.md) · [Measured run data and source hashes](playerbot-melee-simulation-results.json)
+
+
+## Tutorial Island and combat retreat follow-up
+
+The logs place 89 of the original PR's 100 navigation no-progress events on Tutorial Island. Merged dev logged five of its eight events there. The remaining mainland counts were three and eleven respectively. The repeated coordinates around (3092,3106) match the default new character area in r254.
+
+Starting at (3092,3106) for Edgeville, the native pathfinder returned zero waypoints. At the original PR head, an exact destination and the normal per-slot jittered destination each produced one no-progress event while the bot remained on the island. At the merged dev baseline, the same Combat start scheduled a recovery teleport at tick 90 and then approached targets in Edgeville. The legacy recovery masked the missing mainland route. The tutorial exit script also resets stats, worn gear and bank contents, so general travel cannot use that script as a crossing for existing characters.
+
+The planner now recognizes the native island and mine bounds and rejects unsupported crossings before queuing a partial land route. On-island walking remains available. The journey fixture checks both directions, an exact and jittered Combat destination, an upstairs mainland bank and the tutorial mine. It also verifies that the rejection leaves coordinates and progression flags intact.
+
+The old retreat expired after 30 moving ticks and 21 measured progress increments on the real route from (3034,3235) to Draynor. Combat now treats 30 ticks as an inactivity limit, using shared route progress and retaining the chosen bank across the journey. Bank walking uses the shared retry system. In the new fixture the injured bot walks for 47 ticks, reaches (3092,3245) and withdraws six owned shrimp through the native bank interface. A stationary retreat still defers on its 30th active tick.
+
+The follow-up used the same seed 254 and 255 setups, 100 bots and 2,000 ticks per run. All 38 tests passed, including the original 32 tests and the six melee probes. Both follow-up simulations finished with 100 active bots, 100 verified saves, SQLite quick-check OK and zero bot errors.
+
+| Observation | Original PR 254 | Follow-up 254 | Original PR 255 | Follow-up 255 |
+| --- | ---: | ---: | ---: | ---: |
+| Navigation no-progress events | 49 | 6 | 51 | 5 |
+| Emitted Tutorial Island no-progress events | 48 | 0 | 41 | 0 |
+| Emitted unsupported tutorial crossing deferrals | 0 | 44 | 0 | 45 |
+| Combat task deferrals | 57 | 73 | 58 | 61 |
+| All task deferrals | 152 | 345 | 155 | 341 |
+| Damaging melee engagements | 164 | 239 | 152 | 159 |
+| Native hero-credited kills | 139 | 201 | 122 | 121 |
+| Native melee XP | 2,456 | 3,696 | 2,216 | 2,528 |
+| Task-awarded melee XP | 0 | 0 | 0 | 0 |
+
+The follow-up replaces the island stalls with explicit route refusals. It does not establish a mainland route for characters that start on Tutorial Island. Total task deferrals rose from 307 to 686 across the two seeds, including repeated crafting and activity-watchdog failures. These runs do not attribute the full increase to the island guard. Eleven mainland no-progress events still occurred. [Machine-readable results](playerbot-melee-simulation-results.json)

@@ -194,6 +194,35 @@ check('Rimmington and Port Sarim remain mainland while Musa Point and Brimhaven 
     assert.equal(onKaramja(2954, 3147), true);
     assert.equal(onKaramja(2772, 3230), true);
 });
+check('Tutorial Island mainland requests are rejected before walking or changing progress', () => {
+    for (const [x, z, destX, destZ, destLevel] of [
+        [3092, 3106, 3099, 3510, 0], // exact stalled tile and mainland Combat step
+        [3092, 3106, 3093, 3515, 0], // jittered Combat step
+        [3092, 3106, 3208, 3220, 2], // upstairs bank
+        [3092, 9505, 3092, 3245, 0], // tutorial mine
+        [3092, 3245, 3092, 3106, 0]
+    ]) {
+        const { p, b } = make(x, z);
+        const savedVars = p.vars.slice();
+        const reasons: string[] = [];
+        const defer = b.deferCurrentTask.bind(b);
+        b.deferCurrentTask = (reason, ticks) => {
+            reasons.push(reason);
+            defer(reason, ticks);
+        };
+        walkTo(p, destX, destZ, destLevel);
+        assert.deepEqual(reasons, ['no supported route across Tutorial Island boundary']);
+        assert.equal(p.hasWaypoints(), false);
+        assert.equal(p.hasInteraction(), false);
+        assert.equal(b.navigation.failures, 0);
+        assert.deepEqual([p.x, p.z], [x, z]);
+        assert.deepEqual(p.vars, savedVars);
+    }
+    const local = make(3092, 3106);
+    walkTo(local.p, 3094, 3106);
+    assert.equal(local.b.currentTask!.interrupted, false);
+    assert.equal(local.p.hasWaypoints(), true);
+});
 check('a blocked disembark after payment still times out without a second fare', () => {
     const t = make(3028, 3218, 90);
     t.b.currentTask!.tick = () => walkTo(t.p, 2954, 3147);

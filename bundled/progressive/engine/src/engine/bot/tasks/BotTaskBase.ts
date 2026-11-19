@@ -292,6 +292,8 @@ export { WIND_SPELLS, pickBestWindSpell, RangedBowsByLevel, bestRangedBow, Range
  *      tile — proceed to deposit anyway (deposit functions work directly on
  *      inventory objects and do NOT require the bank UI to be open).
  *
+ * Pass null for the stuck detector to use only shared navigation recovery.
+ *
  * Returns:
  *   'walk'   — still navigating, caller should return for this tick
  *   'ready'  — interaction queued (or fallback triggered), set cooldown + state
@@ -299,9 +301,8 @@ export { WIND_SPELLS, pickBestWindSpell, RangedBowsByLevel, bestRangedBow, Range
  */
 export function advanceBankWalk(
     player: Player,
-    stuckDetector: StuckDetector,
+    stuckDetector: StuckDetector | null,
     activityCoord?: [number, number, number],
-    allowRecoveryTeleport = true,
 ): 'walk' | 'ready' | 'direct' {
     const [bx, bz, bl] = activityCoord
         ? nearestBankTo(activityCoord[0], activityCoord[1])
@@ -313,13 +314,9 @@ export function advanceBankWalk(
 
 
 
-        if (!stuckDetector.check(player, bx, bz)) {
+        if (!stuckDetector || !stuckDetector.check(player, bx, bz)) {
             walkTo(player, bx, bz, bl);
         } else if (stuckDetector.desperatelyStuck) {
-            if (!allowRecoveryTeleport) {
-                (player as any)._bot?.deferCurrentTask('bank route stalled');
-                return 'walk';
-            }
             teleportNear(player, bx, bz, bl);
             stuckDetector.reset();
             try {
