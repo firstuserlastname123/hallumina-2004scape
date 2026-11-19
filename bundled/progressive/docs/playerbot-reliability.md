@@ -1,5 +1,7 @@
 # Playerbot navigation and task reliability (r254)
 
+For the current melee encounter behavior, native XP measurements and r254 regression commands, see [Melee combat reliability](playerbot-melee-combat.md).
+
 This change targets `dev` at `1df577575837b7fb07900bf84402a5921dbe2182`.
 The original 9,000-line attachment was unavailable in this workspace. The supplied excerpt and counts (4,615 oscillations, 161 timeout messages, 80 failed sheep searches) are diagnostic references, not the baseline for the measurements below.
 

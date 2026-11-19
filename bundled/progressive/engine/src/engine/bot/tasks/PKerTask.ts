@@ -335,24 +335,7 @@ function equipItem(player: Player, itemId: number): void {
     if (!inv) return;
     const slot = findSlot(inv, itemId);
     if (slot === -1) return;
-    const oType = ObjType.get(itemId);
-    if ((oType.wearpos ?? oType.wearpos2 ?? oType.wearpos3) === 3) {
-        setVarp(player, 'com_mode', 43, 0);
-        if (!player.delayed && interactHeldOp(player, inv, itemId, slot, 2)) {
-            return;
-        }
-    }
-    const worn = player.getInventory(InvType.WORN);
-    if (!worn) return;
-    const wearSlot = oType.wearpos ?? oType.wearpos2 ?? oType.wearpos3;
-    if (wearSlot === null) return;
-    const count = inv.get(slot)?.count ?? 1;
-    inv.set(slot, null);
-    const existing = worn.get(wearSlot);
-    if (existing && existing.id !== -1) {
-        inv.add(existing.id, existing.count);
-    }
-    worn.set(wearSlot, { id: itemId, count });
+    interactHeldOp(player, inv, itemId, slot, 2);
 }
 
 function regear(player: Player, p: PkerProfile): void {
@@ -375,7 +358,7 @@ function tryEquipFromInventory(player: Player, weaponId: number): boolean {
     const slot = findSlot(inv, weaponId);
     if (slot === -1) return false;
     equipItem(player, weaponId);
-    return true;
+    return _wornContains(player, weaponId);
 }
 
 // ── Task ──────────────────────────────────────────────────────────────────────
@@ -409,7 +392,9 @@ export class PKerTask extends BotTask {
     private readonly stuck    = new StuckDetector(25, 4, 2);
     private readonly watchdog = new ProgressWatchdog(300);
 
-    constructor() {
+    private seededStats = false;
+
+    constructor(private readonly provision: boolean = true) {
         super('PKer');
         this.zonePoolIdx  = Math.floor(Math.random() * HUNTING_ZONES.length);
         this.zoneDuration = randInt(ZONE_DURATION_MIN, ZONE_DURATION_MAX);
@@ -488,7 +473,8 @@ export class PKerTask extends BotTask {
     private handleInit(player: Player): void {
         const p = this.profile!;
 
-        if (player.baseLevels[PlayerStat.ATTACK] !== p.atk) {
+        if (this.provision && !this.seededStats) {
+            this.seededStats = true;
             player.baseLevels[PlayerStat.ATTACK] = p.atk;
             player.levels[PlayerStat.ATTACK]     = p.atk;
             player.stats[PlayerStat.ATTACK]      = getExpByLevel(p.atk);
@@ -526,7 +512,7 @@ export class PKerTask extends BotTask {
 
     private replenish(player: Player): void {
         const p = this.profile!;
-        player.getInventory(InvType.INV)?.removeAll();
+        if (!this.provision) return;
 
         for (const id of [p.weapon, p.helm, p.body, p.legs, p.shield, p.neck, p.cape, p.boots, p.gloves, p.ammo]) {
             if (id === -1) continue;
@@ -544,7 +530,7 @@ export class PKerTask extends BotTask {
                 const ammoWearSlot = oType.wearpos ?? oType.wearpos2 ?? oType.wearpos3;
                 if (ammoWearSlot !== null) {
                     const existing = worn.get(ammoWearSlot);
-                    if (existing && existing.id === p.ammo) {
+                    if (existing && existing.id === p.ammo && existing.count < 25) {
                         worn.set(ammoWearSlot, { id: p.ammo, count: 25 });
                     }
                 }
@@ -845,30 +831,7 @@ export class PKerTask extends BotTask {
         const worn = player.getInventory(InvType.WORN);
         if (!worn) return false;
 
-        const curWepId = (worn.get(3)?.id) ?? -1;
-
-        if (curWepId !== p.specWeapon) {
-            if (!tryEquipFromInventory(player, p.specWeapon)) return false;
-            const specType = ObjType.get(p.specWeapon);
-            if (specType.wearpos === 3 && specType.wearpos2 >= 0) {
-                const existing = worn.get(specType.wearpos2);
-                if (existing && existing.id !== -1) {
-                    const inv = player.getInventory(InvType.INV);
-                    if (inv) {
-                        inv.add(existing.id, existing.count);
-                    }
-                    worn.set(specType.wearpos2, null);
-                }
-            }
-            if (curWepId !== -1 && curWepId !== p.specWeapon && _wornContains(player, p.specWeapon)) {
-                const inv = player.getInventory(InvType.INV);
-                if (!inv) return false;
-                if (!inv.add(curWepId, 1).hasSucceeded()) {
-                    tryEquipFromInventory(player, curWepId);
-                    return false;
-                }
-            }
-        }
+        if (player.delayed || !tryEquipFromInventory(player, p.specWeapon) || worn.get(3)?.id !== p.specWeapon) return false;
 
         if (p.specWeapon === I.DRAGON_BATTLEAXE) {
             interactIfButtonByName(player, 'combat_axe:specbar');

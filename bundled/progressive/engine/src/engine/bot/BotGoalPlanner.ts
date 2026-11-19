@@ -18,7 +18,7 @@ import { BotLog } from '#/engine/bot/BotLog.js';
 import Player from '#/engine/entity/Player.js';
 import { PlayerStat, getBaseLevel, hasItem, countItem, isInventoryFull } from '#/engine/bot/BotAction.js';
 import { Items, Locations, SkillProgression, getProgressionStep, getWoodcuttingStepForLog } from '#/engine/bot/BotKnowledge.js';
-import { getMissingPurchases, canAffordStep, totalCostOfMissing } from '#/engine/bot/BotNeeds.js';
+import { hasAllTools, getMissingPurchases, canAffordStep, totalCostOfMissing } from '#/engine/bot/BotNeeds.js';
 import type { Purchase } from '#/engine/bot/BotNeeds.js';
 import { bankInvId, BotTask } from '#/engine/bot/tasks/BotTaskBase.js';
 import { InitTask, BuryBonesTask, IdleTask, BankTask } from '#/engine/bot/tasks/UtilTasks.js';
@@ -202,6 +202,21 @@ const NEARBY_SHOPS = new Set(['BOB_AXES', 'LUMBRIDGE_GENERAL', 'AL_KHARID_SCIMIT
 export class BotGoalPlanner {
     readonly personality: BotPersonality;
     private initialised = false;
+    protected usesNativeStarterKit = false;
+    protected freshProfile = false;
+
+    useNativeStarterKit(): void {
+        this.usesNativeStarterKit = true;
+        this.initialised = true;
+    }
+
+    enableFreshProfile(): void {
+        this.freshProfile = true;
+    }
+
+    protected get canProvisionProfile(): boolean {
+        return !this.usesNativeStarterKit || this.freshProfile;
+    }
     // Counts pickTask calls remaining before bankstand is eligible again.
     // Initialised with a random offset so bots don't all bankstand at once.
     private bankstandCooldown = Math.floor(Math.random() * 20) + 10;
@@ -451,7 +466,7 @@ export class BotGoalPlanner {
                 } else {
                     toolOk = (step.action === 'woodcut' || step.action === 'mine')
                         ? step.toolItemIds.some(id => hasItem(player, id))
-                        : step.toolItemIds.every(id => hasItem(player, id));
+                        : hasAllTools(player, step);
                     if (!toolOk) continue;
                 }
 
@@ -1013,7 +1028,7 @@ export class BotGoalPlanner {
     private _cheapestCombatTask(player: Player): BotTask | null {
         for (const skillName of ['ATTACK', 'STRENGTH', 'DEFENCE']) {
             const stat = SKILL_STAT[skillName];
-            if (!stat) continue;
+            if (stat === undefined) continue;
             const level = getBaseLevel(player, stat);
             const step = getProgressionStep(skillName, level);
             if (!step) continue;
@@ -1021,7 +1036,7 @@ export class BotGoalPlanner {
             const missing = getMissingPurchases(player, step);
             if (missing.length === 0) {
                 // getMissingPurchases silently drops unaffordable items, so verify ownership
-                if (!step.toolItemIds.every(id => hasItem(player, id))) continue;
+                if (!hasAllTools(player, step)) continue;
                 // Has all tools — can fight
                 return new CombatTask(step, stat); // has weapon
             }
@@ -1100,7 +1115,7 @@ export class AgilityTestGoalPlanner extends BotGoalPlanner {
     }
 
     override pickTask(player: Player): BotTask | null {
-        if (!this.seededStats) {
+        if (!this.seededStats && this.canProvisionProfile) {
             this.seededStats = true;
             if (getBaseLevel(player, PlayerStat.AGILITY) < 35) {
                 player.setLevel(PlayerStat.AGILITY, 35);
@@ -1110,7 +1125,7 @@ export class AgilityTestGoalPlanner extends BotGoalPlanner {
             }
         }
 
-        if (!this.started) {
+        if (!this.started && !this.usesNativeStarterKit) {
             this.started = true;
             return new InitTask([]);
         }
@@ -1132,7 +1147,6 @@ export type ExtrasType = 'social' | 'vendor' | 'pker' | 'edgeville_pker';
  */
 export class ExtrasGoalPlanner extends BotGoalPlanner {
     private readonly extrasType: ExtrasType;
-    private extrasInit = false;
 
     constructor(type: ExtrasType) {
         super({ name: `Extras-${type}`, weights: {} });
@@ -1140,15 +1154,13 @@ export class ExtrasGoalPlanner extends BotGoalPlanner {
     }
 
     override pickTask(_player: Player): BotTask | null {
-        if (!this.extrasInit) {
-            this.extrasInit = true;
-            // Extras bots skip the normal InitTask — their tasks self-initialise.
-        }
+        const provision = this.canProvisionProfile;
+        this.freshProfile = false;
         switch (this.extrasType) {
             case 'social':         return new SocialTask();
-            case 'vendor':         return new VendorTask();
-            case 'pker':           return new PKerTask();
-            case 'edgeville_pker': return new EdgevillePKerTask();
+            case 'vendor':         return new VendorTask(provision);
+            case 'pker':           return new PKerTask(provision);
+            case 'edgeville_pker': return new EdgevillePKerTask(provision);
         }
     }
 }

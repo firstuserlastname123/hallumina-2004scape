@@ -91,6 +91,12 @@ export function tunnelAvailable(p: Player): boolean {
 export function onKaramja(x: number, z: number): boolean {
     return isInside(KARAMJA_POLYGON, x, z);
 }
+/** Bounds from the native RuneScript in_tutorial_island predicate, including its mine. */
+export function onTutorialIsland(x: number, z: number): boolean {
+    return (x >= 3053 && x <= 3156 && z >= 3056 && z <= 3136) ||
+        (x >= 3072 && x <= 3118 && z >= 9492 && z <= 9535);
+}
+
 /** Continuous exposure estimate, not a combat-level eligibility threshold. */
 export function travelCondition(p: Player) {
     const weights = bot(p)?.planner.personality.weights ?? {};
@@ -198,7 +204,11 @@ export function journeyTarget(p: Player, x: number, z: number, level: number): P
     const owner = bot(p)?.activeTask;
     if (j?.clicked) return j.legs[j.index].from;
     if (!j || j.owner !== owner || j.goal.level !== level || Math.max(Math.abs(j.goal.x - x), Math.abs(j.goal.z - z)) > 4) {
-        const plan = level === 0 && p.level === 0 ? chooseTravel(p, x, z) : { mode: 'land', legs: [], reserve: 0 };
+        // Walking cannot cross the sea here. Native tutorial completion is
+        // separate from travel planning and can change inventory and stats.
+        const crossesTutorialBoundary = onTutorialIsland(p.x, p.z) !== onTutorialIsland(x, z);
+        const plan = crossesTutorialBoundary ? { mode: 'tutorial-boundary', legs: [], reserve: 0 }
+            : level === 0 && p.level === 0 ? chooseTravel(p, x, z) : { mode: 'land', legs: [], reserve: 0 };
         if (!onKaramja(p.x, p.z) && homes.get(p) === p.x >= 2870) homes.delete(p);
         if (!homes.has(p) && !onKaramja(p.x, p.z) && plan.mode === 'ship') homes.set(p, p.x >= 2870);
         j = {
@@ -217,12 +227,16 @@ export function journeyTarget(p: Player, x: number, z: number, level: number): P
         };
         journeys.set(p, j);
         BotLog.event('debug', p.username, 'travel_plan', `${plan.mode} to (${x},${z},${level}), reserve=${plan.reserve}`);
+        if (plan.mode === 'tutorial-boundary') {
+            bot(p)?.deferCurrentTask('no supported route across Tutorial Island boundary');
+            return false;
+        }
         if (plan.mode === 'unaffordable' || plan.mode === 'restricted' || plan.mode === 'unsafe') {
             bot(p)?.deferCurrentTask(`travel ${plan.mode}: safe journey and return require ${plan.reserve} carried coins`);
             return false;
         }
     }
-    if (j.mode === 'unaffordable' || j.mode === 'restricted' || j.mode === 'unsafe') return false;
+    if (j.mode === 'tutorial-boundary' || j.mode === 'unaffordable' || j.mode === 'restricted' || j.mode === 'unsafe') return false;
     return j.index < j.legs.length ? j.legs[j.index].from : null;
 }
 function nearby(p: Player, x: number, z: number, radius: number) {

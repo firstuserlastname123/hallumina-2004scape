@@ -66,3 +66,9 @@ for (const mode of ['local', 'central']) {
         assert.match(run(fixture(t), 'persistence-admission.ts', mode), /persistence admission .* checks passed/);
     });
 }
+
+test('configured fresh bots use the native tutorial skip and resume safely across restart', t => {
+    const options = fixture(t);
+    assert.match(run(options, 'bot-tutorial.ts'), /tutorial creation checks passed/);
+    assert.match(run(options, 'bot-tutorial.ts', 'restore'), /tutorial restart checks passed/);
+});
