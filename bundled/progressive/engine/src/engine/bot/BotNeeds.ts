@@ -13,6 +13,7 @@
  *   - Added totalCostOfPurchases helper used by BotGoalPlanner
  */
 
+import InvType from '#/cache/config/InvType.js';
 import Player from '#/engine/entity/Player.js';
 import { countItem } from '#/engine/bot/BotAction.js';
 import { Items, Shops, SkillStep } from '#/engine/bot/BotKnowledge.js';
@@ -37,9 +38,13 @@ export function hasTool(player: Player, toolItemId: number): boolean {
     return countItem(player, toolItemId) > 0;
 }
 
+export function hasStepTool(player: Player, step: SkillStep, id: number): boolean {
+    return hasTool(player, id) || (step.action === 'combat' && !!player.getInventory(InvType.WORN)?.contains(id));
+}
+
 /** Does the bot have every tool required for this skill step? */
 export function hasAllTools(player: Player, step: SkillStep): boolean {
-    return step.toolItemIds.every(id => hasTool(player, id));
+    return step.toolItemIds.every(id => hasStepTool(player, step, id));
 }
 
 /** Does the bot have enough coins for the given amount? */
@@ -79,7 +84,7 @@ export function getMissingPurchases(player: Player, step: SkillStep): Purchase[]
     let coinsRemaining = countItem(player, Items.COINS);
 
     for (const toolId of step.toolItemIds) {
-        if (hasTool(player, toolId)) continue;
+        if (hasStepTool(player, step, toolId)) continue;
 
         // Find which shop sells this tool
         let found = false;
@@ -135,7 +140,7 @@ export function totalCostOfMissing(player: Player, step: SkillStep): number {
     // we want the theoretical total even if the bot can't afford it yet
     let total = 0;
     for (const toolId of step.toolItemIds) {
-        if (hasTool(player, toolId)) continue;
+        if (hasStepTool(player, step, toolId)) continue;
         for (const shopKey in Shops) {
             const shop = Shops[shopKey];
             const item = shop.stock.find(s => s.itemId === toolId);

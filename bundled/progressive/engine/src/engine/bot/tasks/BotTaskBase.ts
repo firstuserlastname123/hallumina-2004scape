@@ -301,6 +301,7 @@ export function advanceBankWalk(
     player: Player,
     stuckDetector: StuckDetector,
     activityCoord?: [number, number, number],
+    allowRecoveryTeleport = true,
 ): 'walk' | 'ready' | 'direct' {
     const [bx, bz, bl] = activityCoord
         ? nearestBankTo(activityCoord[0], activityCoord[1])
@@ -315,6 +316,10 @@ export function advanceBankWalk(
         if (!stuckDetector.check(player, bx, bz)) {
             walkTo(player, bx, bz, bl);
         } else if (stuckDetector.desperatelyStuck) {
+            if (!allowRecoveryTeleport) {
+                (player as any)._bot?.deferCurrentTask('bank route stalled');
+                return 'walk';
+            }
             teleportNear(player, bx, bz, bl);
             stuckDetector.reset();
             try {

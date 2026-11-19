@@ -46,6 +46,26 @@ const logModule = fs.existsSync('src/engine/bot/BotLog.ts') ? await import('#/en
 const { default: Packet } = await import('#/io/Packet.js');
 if (Environment.ENGINE_REVISION !== 254) throw new Error('This simulation requires revision 254.');
 
+// Compare identical encounter observations on both revisions. Count the first
+// native melee XP for each player/NPC life, and credit deaths to the native hero.
+const melee = { damagingEngagements: 0, kills: 0, nativeXp: 0, taskXp: 0, emptySearches: 0,
+    travelProgress: 0, deferrals: 0, unreachable: 0, noAttack: 0 };
+const fighters = new Map<import('#/engine/entity/Npc.js').default, Set<bigint>>();
+const removeNpc = World.removeNpc.bind(World);
+World.removeNpc = (npc, duration) => {
+    if (npc.levels[3] === 0 && fighters.get(npc)?.has(npc.heroPoints.findHero())) melee.kills++;
+    fighters.delete(npc);
+    return removeNpc(npc, duration);
+};
+const { CombatTask } = await import('#/engine/bot/tasks/CombatTask.js');
+const combatPrototype = CombatTask.prototype as any;
+const search = combatPrototype._findTargetNpc;
+combatPrototype._findTargetNpc = function (p: InstanceType<typeof Player>) {
+    const result = search.call(this, p);
+    if (!result) melee.emptySearches++;
+    return result;
+};
+let scriptNpc: import('#/engine/entity/Npc.js').default | undefined;
 const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0,
     routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
 // Same observers are copied to both implementations. Script starts include the
@@ -126,8 +146,10 @@ Player.prototype.executeScript = function (...args) {
                 level: this.level, x: this.x, z: this.z, tick: World.currentTick, gate: kind === 'gate' });
         }
     }
+    const previousNpc = scriptNpc;
+    scriptNpc = state._activeNpc ?? undefined;
     nativeScriptDepth++;
-    try { return executeScript.apply(this, args); } finally { nativeScriptDepth--; }
+    try { return executeScript.apply(this, args); } finally { nativeScriptDepth--; scriptNpc = previousNpc; }
 };
 const completeTask = (BotPlayer.prototype as any)._recordComplete;
 (BotPlayer.prototype as any)._recordComplete = function (...args: any[]) {
@@ -172,7 +194,10 @@ BotPlayer.prototype.log = function (message: string, ...args: any[]) {
     const key = args[1];
     if (key === 'path_failed') counters.pathFailures++;
     if (key === 'no_progress') counters.noProgress++;
-    if (key === 'task_deferred') counters.taskDeferrals++;
+    if (key === 'task_deferred') {
+        counters.taskDeferrals++;
+        if (this.activeTask?.name === 'Combat') melee.deferrals++;
+    }
     if (key === 'subtask_deferred') counters.subtaskDeferrals++;
     if (message.includes('[Navigation] oscillating')) {
         counters.oscillation++;
@@ -210,6 +235,19 @@ Player.prototype.addXp = function (stat, xp, allowMulti = true) {
     const beforeLevel = this.baseLevels[stat];
     originalXp.call(this, stat, xp, allowMulti);
     if (this.is_bot && World.currentTick >= 20) {
+        if ((this as any)._bot?.activeTask?.name === 'Combat' && stat <= 2 && this.stats[stat] > before) {
+            const delta = (this.stats[stat] - before) / 10;
+            if (!nativeScriptDepth) melee.taskXp += delta;
+            else {
+                melee.nativeXp += delta;
+                if (scriptNpc) {
+                    const participants = fighters.get(scriptNpc) ?? new Set<bigint>();
+                    if (!participants.has(this.hash64)) melee.damagingEngagements++;
+                    participants.add(this.hash64);
+                    fighters.set(scriptNpc, participants);
+                }
+            }
+        }
         if(nativeScriptDepth>0) {nativeXp.set(this.username,(nativeXp.get(this.username)??0)+Math.max(0,this.stats[stat]-before)/10);xpThisTick.add(this.username);}
         actionXp.set(this.username, (actionXp.get(this.username) ?? 0) + Math.max(0, this.stats[stat] - before) / 10);
         actionLevels.set(this.username, (actionLevels.get(this.username) ?? 0) + Math.max(0, this.baseLevels[stat] - beforeLevel));
@@ -235,6 +273,7 @@ Player.prototype.clearWaypoints = function () {
 };
 const worldTimes: number[] = [];
 const botTimes: number[] = [];
+const travelSerial = new WeakMap<InstanceType<typeof BotPlayer>, number>();
 const tasksSeen = new Map<string, Set<string>>();
 const samples: unknown[] = [];
 const manager = BotManager as any;
@@ -252,6 +291,9 @@ BotManager.tick = () => {
         else if(bot.player.hasWaypoints() || /walk|travel/.test(state)) participation.travelBotTicks++;
         else if(/^(Init|ShopTrip|Bank|Walk)$/.test(name)) participation.supportBotTicks++;
         else {participation.activityBotTicks++;if(!bot.planner.personality.name.startsWith('Extras'))participation.progressionActivityBotTicks++;}
+        const serial = bot.navigation.meaningfulTravelSerial;
+        if (name === 'Combat' && state === 'walk') melee.travelProgress += Math.max(0, serial - (travelSerial.get(bot) ?? serial));
+        travelSerial.set(bot, serial);
         if(name==='Agility')participation.agilityTaskBotTicks++;
         if(xpThisTick.has(bot.name))participation.nativeXpBotTicks++;
     }
@@ -334,14 +376,16 @@ for (const bot of population()) {
     }
     verifiedSaves++;
 }
-const report = { seed, ticks, simulatedMinutes: ticks * 0.6 / 60, intervalMs: interval, wallSeconds: (performance.now() - wallStart) / 1000,
+melee.unreachable = logModule?.BotLog.counts.target_unreachable ?? 0;
+melee.noAttack = logModule?.BotLog.counts.no_attack_timeout ?? 0;
+const report = { melee, seed, ticks, simulatedMinutes: ticks * 0.6 / 60, intervalMs: interval, wallSeconds: (performance.now() - wallStart) / 1000,
     version: process.env.BOT_SIM_LABEL ?? 'unspecified', sourceSha256: process.env.BOT_SIM_SOURCE_SHA256 ?? null,
     featureSupport: { navigationRetry: typeof BotPlayer.prototype.navigationFailed === 'function', taskDeferral: typeof BotPlayer.prototype.deferCurrentTask === 'function' },
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },
     active, counters, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
-        'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
+        'tasks/CombatTask.ts', 'BotGoalPlanner.ts', 'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
     ].map(file => [file, fs.existsSync(`src/engine/bot/${file}`) ? createHash('sha256').update(fs.readFileSync(`src/engine/bot/${file}`)).digest('hex') : null])), eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
     steadyWorldTiming: timing(worldTimes.slice(20)), steadyBotTiming: timing(botTimes.slice(20)),
     xpGained: bots.reduce((sum, b) => sum + b.xpGained, 0), levelsGained: bots.reduce((sum, b) => sum + b.levelsGained, 0),

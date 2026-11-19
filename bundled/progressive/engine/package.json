@@ -29,7 +29,7 @@
     "start": "npm install && tsx src/app.ts",
     "hiscores": "tsx hiscores.ts",
     "launcher": "tsx launcher.ts",
-    "test:bot": "node --import tsx --test tests/bot-reliability.test.ts tests/bot-runtime.test.ts",
+    "test:bot": "node --import tsx --test tests/bot-reliability.test.ts tests/bot-runtime.test.ts tests/bot-melee.test.ts",
     "test:integrity": "node --import tsx --test tests/build-integrity.test.ts",
     "bot:simulate": "tsx tools/bot/simulate.ts"
   },

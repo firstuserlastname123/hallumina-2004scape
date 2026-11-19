@@ -2591,9 +2591,9 @@ export function findAnyObj(player: Player, cx: number, cz: number, level: number
  * Find lootable ground objects (monster drops, items that will despawn).
  * Excludes static/world items that have FOREVER lifecycle.
  */
-export function findLootObj(player: Player, cx: number, cz: number, level: number, radius = 1): Obj | null {
+export function findLootObj(player: Player, cx: number, cz: number, level: number, radius = 1, accept?: (obj: Obj) => boolean): Obj | null {
     return _findObj(player, cx, cz, level, radius, obj => {
-        return obj.lifecycle === EntityLifeCycle.DESPAWN;
+        return obj.lifecycle === EntityLifeCycle.DESPAWN && (!accept || accept(obj));
     });
 }
 
@@ -3264,13 +3264,19 @@ function _hasGateInteractionPending(player: Player): boolean {
 }
 
 /** Prefer a barrier in the requested direction; failed ones expire after cooldown. */
-export function openGateToward(player: Player, destX: number, destZ: number, radius = 10): boolean {
+export function openGateToward(player: Player, destX: number, destZ: number, radius = 10, alongApproach = false): boolean {
     if (pollObstacle(player)) return true;
     const dx = destX - player.x;
     const dz = destZ - player.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 1) return false;
     const gate = _findLoc(player.x, player.z, player.level, Math.min(radius, dist + 2), loc => {
+        if (alongApproach) {
+            const gx = loc.x - player.x;
+            const gz = loc.z - player.z;
+            const projection = (gx * dx + gz * dz) / dist;
+            if (projection < 0 || projection > dist + 1 || Math.abs(gx * dz - gz * dx) / dist > 2) return false;
+        }
         return gateOp(loc) !== null && !isObstacleSuppressed(player, loc) &&
             ((loc.x === player.x && loc.z === player.z) || (loc.x - player.x) * dx + (loc.z - player.z) * dz > 0);
     });

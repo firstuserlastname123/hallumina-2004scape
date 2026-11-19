@@ -235,7 +235,7 @@ export class RangedMagicTask extends BotTask {
         // ── HP CHECK & HEALING ───────────────────────────────────────────────────
         // Mirrors CombatTask — this task previously had no food/HP handling at
         // all, so bots would keep fighting (and dying) at any HP.
-        const hp = player.stats[PlayerStat.HITPOINTS];
+        const hp = player.levels[PlayerStat.HITPOINTS];
         const maxHp = player.baseLevels[PlayerStat.HITPOINTS];
         const hpSafeStates = ['bank_walk', 'bank_deposit', 'shop_walk', 'shop_open', 'shop_buy', 'check_equip', 'flee', 'eat'];
         if (hp < maxHp * 0.4 && !hpSafeStates.includes(this.state)) {
@@ -951,7 +951,7 @@ export class RangedMagicTask extends BotTask {
                 this._log(player, `ate ${foodId} to heal`, 'ate_food');
                 this.cooldown = 3;
 
-                const hp = player.stats[PlayerStat.HITPOINTS];
+                const hp = player.levels[PlayerStat.HITPOINTS];
                 const maxHp = player.baseLevels[PlayerStat.HITPOINTS];
                 if (hp < maxHp * 0.8 && this._hasFood(player)) {
                     this.state = 'eat';

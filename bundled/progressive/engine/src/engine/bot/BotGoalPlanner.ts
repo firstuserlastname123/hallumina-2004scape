@@ -18,7 +18,7 @@ import { BotLog } from '#/engine/bot/BotLog.js';
 import Player from '#/engine/entity/Player.js';
 import { PlayerStat, getBaseLevel, hasItem, countItem, isInventoryFull } from '#/engine/bot/BotAction.js';
 import { Items, Locations, SkillProgression, getProgressionStep, getWoodcuttingStepForLog } from '#/engine/bot/BotKnowledge.js';
-import { getMissingPurchases, canAffordStep, totalCostOfMissing } from '#/engine/bot/BotNeeds.js';
+import { hasAllTools, getMissingPurchases, canAffordStep, totalCostOfMissing } from '#/engine/bot/BotNeeds.js';
 import type { Purchase } from '#/engine/bot/BotNeeds.js';
 import { bankInvId, BotTask } from '#/engine/bot/tasks/BotTaskBase.js';
 import { InitTask, BuryBonesTask, IdleTask, BankTask } from '#/engine/bot/tasks/UtilTasks.js';
@@ -451,7 +451,7 @@ export class BotGoalPlanner {
                 } else {
                     toolOk = (step.action === 'woodcut' || step.action === 'mine')
                         ? step.toolItemIds.some(id => hasItem(player, id))
-                        : step.toolItemIds.every(id => hasItem(player, id));
+                        : hasAllTools(player, step);
                     if (!toolOk) continue;
                 }
 
@@ -1013,7 +1013,7 @@ export class BotGoalPlanner {
     private _cheapestCombatTask(player: Player): BotTask | null {
         for (const skillName of ['ATTACK', 'STRENGTH', 'DEFENCE']) {
             const stat = SKILL_STAT[skillName];
-            if (!stat) continue;
+            if (stat === undefined) continue;
             const level = getBaseLevel(player, stat);
             const step = getProgressionStep(skillName, level);
             if (!step) continue;
@@ -1021,7 +1021,7 @@ export class BotGoalPlanner {
             const missing = getMissingPurchases(player, step);
             if (missing.length === 0) {
                 // getMissingPurchases silently drops unaffordable items, so verify ownership
-                if (!step.toolItemIds.every(id => hasItem(player, id))) continue;
+                if (!hasAllTools(player, step)) continue;
                 // Has all tools — can fight
                 return new CombatTask(step, stat); // has weapon
             }
