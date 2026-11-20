@@ -15,19 +15,19 @@
  *   - Level-up upgrades step and re-walks to new area.
  */
 
+import { findReachableLoc } from '#/engine/bot/BotAction.js';
 import { BotLog } from '#/engine/bot/BotLog.js';
 import { findLocApproach } from '#/engine/bot/BotNavigation.js';
 import LocType from '#/cache/config/LocType.js';
 import {
     BotTask, Player, Loc, InvType,
     walkTo, interactLoc,
-    findLocByPrefixWhere,
     claimLoc, releaseLoc, isLocClaimed,
     hasItem, addItem, isInventoryFull, isNear,
     getBaseLevel, PlayerStat,
     Items, Locations, getProgressionStep,
     randInt, bankInvId, INTERACT_TIMEOUT, StuckDetector, ProgressWatchdog,
-    isAdjacentToLoc, openNearbyGate, botJitter, advanceBankWalk, hasStrayItems,
+    isAdjacentToLoc, botJitter, advanceBankWalk, hasStrayItems,
 } from '#/engine/bot/tasks/BotTaskBase.js';
 import type { SkillStep } from '#/engine/bot/tasks/BotTaskBase.js';
 import { getCombatLevel, getNpcCombatLevel, findAggressorNpc } from '#/engine/bot/BotAction.js';
@@ -342,9 +342,11 @@ export class WoodcuttingTask extends BotTask {
         // for bots standing in roughly the same spot). But if every tree in
         // range is already claimed, fall back to the closest one regardless —
         // better to share a tree than to sit scanning forever finding nothing.
-        const unclaimed = findLocByPrefixWhere(player.x, player.z, player.level, this._treePrefix(), 15, loc => !isLocClaimed(loc) && (this.unavailableTrees.get(loc) ?? 0) <= player.playtime, 'stump');
-        if (unclaimed) return unclaimed;
-        return findLocByPrefixWhere(player.x, player.z, player.level, this._treePrefix(), 15, loc => (this.unavailableTrees.get(loc) ?? 0) <= player.playtime, 'stump');
+        return findReachableLoc(player, 15, loc => {
+            const name = LocType.get(loc.type).debugname ?? '';
+            return name.startsWith(this._treePrefix()) && !name.includes('stump') &&
+                (this.unavailableTrees.get(loc) ?? 0) <= player.playtime;
+        }, loc => isLocClaimed(loc) ? 20 : 0);
     }
 
     private _excludeTree(player: Player, tree: Loc): void {
@@ -365,7 +367,7 @@ export class WoodcuttingTask extends BotTask {
      */
     private _isTreeStillValid(tree: Loc): boolean {
         const name = LocType.get(tree.type).debugname ?? '';
-        return name.startsWith(this._treePrefix()) && !name.includes('stump');
+        return tree.isValid() && name.startsWith(this._treePrefix()) && !name.includes('stump');
     }
 
     private _treePrefix(): string {
@@ -448,12 +450,6 @@ export class WoodcuttingTask extends BotTask {
             this.stuck.reset();
             return;
         }
-        if (openNearbyGate(player, 5)) return;
-
-        const dx   = lx - player.x;
-        const dz   = lz - player.z;
-        const escX = player.x + (Math.abs(dz) > Math.abs(dx) ? randInt(-10, 10) : (dz > 0 ? 10 : -10));
-        const escZ = player.z + (Math.abs(dx) > Math.abs(dz) ? randInt(-10, 10) : (dx > 0 ? 10 : -10));
-        walkTo(player, escX, escZ);
+        walkTo(player, lx, lz);
     }
 }

@@ -66,6 +66,22 @@ combatPrototype._findTargetNpc = function (p: InstanceType<typeof Player>) {
     return result;
 };
 let scriptNpc: import('#/engine/entity/Npc.js').default | undefined;
+const navigationFailures: Record<string, number> = {};
+const failureSamples: object[] = [];
+const exposure: Record<string, { ticks: number; starts: number; walking: number; aboveGroundFloor: number }> = {};
+const transitionDetails: Record<string, { clicks: number; scripts: number; completed: number; unverified: number; floorChanged: number }> = {};
+const floorChanges: { tick: number; name: string; task: string; state: string; from: number[]; to: number[] }[] = [];
+const floorHistory = new WeakMap<object, { x: number; z: number; level: number; task: string; state: string }>();
+const previousTasks = new WeakMap<object, object>();
+const deferralReasons: Record<string, number> = {};
+const failureLocations: Record<string, number> = {};
+function transitionRecord(player: InstanceType<typeof Player>, loc: InstanceType<typeof Loc>, task?: string) {
+    const owner = task ?? (player as any)._bot?.activeTask?.name ?? 'unknown';
+    const id = `${owner}:${LocType.get(loc.type).debugname ?? loc.type}@${loc.x},${loc.z},${loc.level}`;
+    return transitionDetails[id] ??= { clicks: 0, scripts: 0, completed: 0, unverified: 0, floorChanged: 0 };
+}
+const services = { bankOpened: 0, shopOpened: 0 };
+const modals = new WeakMap<object, number>();
 const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0,
     routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
 // Same observers are copied to both implementations. Script starts include the
@@ -97,7 +113,7 @@ const obstacles = { gateClicks: 0, gateScripts: 0, gateOpened: 0, gateUnverified
     transitionClicks: 0, transitionScripts: 0, transitionCompleted: 0, transitionUnverified: 0 };
 const completions: Record<string, number> = {};
 const pendingObstacles: { player: InstanceType<typeof Player>; loc: InstanceType<typeof Loc>; type: number;
-    angle: number; shape: number; level: number; x: number; z: number; tick: number; gate: boolean }[] = [];
+    angle: number; shape: number; level: number; x: number; z: number; tick: number; gate: boolean; task: string }[] = [];
 function obstacleKind(loc: InstanceType<typeof Loc>): 'gate' | 'transition' | null {
     const t = LocType.get(loc.type);
     const ops = (t.op ?? []).filter((op): op is string => typeof op === 'string');
@@ -119,7 +135,12 @@ function observeObstacles(final = false): void {
             o.player.level !== o.level || Math.max(Math.abs(o.player.x - o.x), Math.abs(o.player.z - o.z)) >= 2);
         if (completed || (!o.gate && settled) || World.currentTick - o.tick >= 25 || final) {
             if (o.gate) { if (completed) obstacles.gateOpened++; else obstacles.gateUnverified++; }
-            else { if (completed) obstacles.transitionCompleted++; else obstacles.transitionUnverified++; }
+            else {
+                if (completed) obstacles.transitionCompleted++; else obstacles.transitionUnverified++;
+                const detail = transitionRecord(o.player, o.loc, o.task);
+                if (completed) detail.completed++; else detail.unverified++;
+                if (o.player.level !== o.level || (o.player.z > 4100) !== (o.z > 4100)) detail.floorChanged++;
+            }
             pendingObstacles.splice(i, 1);
         }
     }
@@ -130,7 +151,7 @@ Player.prototype.setInteraction = function (...args) {
     if (result && this.is_bot && args[1] instanceof Loc) {
         const kind = obstacleKind(args[1]);
         if (kind === 'gate') obstacles.gateClicks++;
-        if (kind === 'transition') obstacles.transitionClicks++;
+        if (kind === 'transition') { obstacles.transitionClicks++; transitionRecord(this, args[1]).clicks++; }
     }
     return result;
 };
@@ -141,9 +162,9 @@ Player.prototype.executeScript = function (...args) {
     if (this.is_bot && !args[2] && loc && /oploc[1-5],/.test(state.script.name)) {
         const kind = obstacleKind(loc);
         if (kind) {
-            if (kind === 'gate') obstacles.gateScripts++; else obstacles.transitionScripts++;
+            if (kind === 'gate') obstacles.gateScripts++; else { obstacles.transitionScripts++; transitionRecord(this, loc).scripts++; }
             pendingObstacles.push({ player: this, loc, type: loc.type, angle: loc.angle, shape: loc.shape,
-                level: this.level, x: this.x, z: this.z, tick: World.currentTick, gate: kind === 'gate' });
+                level: this.level, x: this.x, z: this.z, tick: World.currentTick, gate: kind === 'gate', task: (this as any)._bot?.activeTask?.name ?? 'unknown' });
         }
     }
     const previousNpc = scriptNpc;
@@ -192,10 +213,20 @@ if (logModule) {
 const originalLog = BotPlayer.prototype.log;
 BotPlayer.prototype.log = function (message: string, ...args: any[]) {
     const key = args[1];
+    if (['path_failed', 'no_progress', 'obstacle_failed', 'navigation_stuck', 'navigation_oscillation'].includes(key)) {
+        const name = this.activeTask?.name ?? 'unknown';
+        const location = `${name}:${String((this.activeTask as any)?.state ?? '')}:${key}@${this.player.x},${this.player.z},${this.player.level}->${this.navigation.destinationLabel}`;
+        failureLocations[location] = (failureLocations[location] ?? 0) + 1;
+        navigationFailures[`${name}:${key}`] = (navigationFailures[`${name}:${key}`] ?? 0) + 1;
+        if (failureSamples.length < 1000) failureSamples.push({ tick: World.currentTick, name: this.name, task: name,
+            event: key, at: [this.player.x, this.player.z, this.player.level], destination: this.navigation.destinationLabel });
+    }
     if (key === 'path_failed') counters.pathFailures++;
     if (key === 'no_progress') counters.noProgress++;
     if (key === 'task_deferred') {
         counters.taskDeferrals++;
+        const reason = `${this.activeTask?.name ?? 'unknown'}:${message.replace(/^.*deferred for \d+ ticks: /, '')}`;
+        deferralReasons[reason] = (deferralReasons[reason] ?? 0) + 1;
         if (this.activeTask?.name === 'Combat') melee.deferrals++;
     }
     if (key === 'subtask_deferred') counters.subtaskDeferrals++;
@@ -285,8 +316,25 @@ BotManager.tick = () => {
     for (const bot of population()) {
         if (!tasksSeen.has(bot.name)) tasksSeen.set(bot.name, new Set());
         if (bot.currentTask) tasksSeen.get(bot.name)!.add(bot.currentTask.name);
+        const modal = bot.player.modalMain;
+        if (modals.get(bot.player) !== modal) {
+            if (modal === 5292) services.bankOpened++;
+            if (modal === 3824) services.shopOpened++;
+            modals.set(bot.player, modal);
+        }
         const name=bot.activeTask?.name??'Idle';
         const state=String((bot.activeTask as any)?.state??'');
+        const group = exposure[`${name}:${state}`] ??= { ticks: 0, starts: 0, walking: 0, aboveGroundFloor: 0 };
+        group.ticks++;
+        if (bot.player.hasWaypoints()) group.walking++;
+        if (bot.player.level !== 0 || bot.player.z > 4100) group.aboveGroundFloor++;
+        if (bot.activeTask && previousTasks.get(bot) !== bot.activeTask) { group.starts++; previousTasks.set(bot, bot.activeTask); }
+        const previous = floorHistory.get(bot);
+        if (previous && (previous.level !== bot.player.level || (previous.z > 4100) !== (bot.player.z > 4100))) {
+            floorChanges.push({ tick: World.currentTick, name: bot.name, task: previous.task, state: previous.state,
+                from: [previous.x, previous.z, previous.level], to: [bot.player.x, bot.player.z, bot.player.level] });
+        }
+        floorHistory.set(bot, { x: bot.player.x, z: bot.player.z, level: bot.player.level, task: name, state });
         if(name==='Idle') participation.idleBotTicks++;
         else if(bot.player.hasWaypoints() || /walk|travel/.test(state)) participation.travelBotTicks++;
         else if(/^(Init|ShopTrip|Bank|Walk)$/.test(name)) participation.supportBotTicks++;
@@ -384,8 +432,8 @@ const report = { melee, seed, ticks, simulatedMinutes: ticks * 0.6 / 60, interva
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },
-    active, counters, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
-        'tasks/CombatTask.ts', 'BotGoalPlanner.ts', 'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
+    active, counters, exposure, transitionDetails, floorChanges, deferralReasons, failureLocations, navigationFailures, failureSamples, services, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
+        'tasks/CombatTask.ts', 'BotGoalPlanner.ts', 'BotAction.ts', 'BotNavigation.ts', 'BotLocalRoute.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/MiningTask.ts', 'tasks/FishingTask.ts', 'tasks/ShopTripTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
     ].map(file => [file, fs.existsSync(`src/engine/bot/${file}`) ? createHash('sha256').update(fs.readFileSync(`src/engine/bot/${file}`)).digest('hex') : null])), eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
     steadyWorldTiming: timing(worldTimes.slice(20)), steadyBotTiming: timing(botTimes.slice(20)),
     xpGained: bots.reduce((sum, b) => sum + b.xpGained, 0), levelsGained: bots.reduce((sum, b) => sum + b.levelsGained, 0),

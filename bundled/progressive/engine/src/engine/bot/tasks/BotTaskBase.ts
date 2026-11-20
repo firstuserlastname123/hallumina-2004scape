@@ -5,8 +5,12 @@
  * All task files import from here.
  */
 
+import { chooseTravel, onTutorialIsland } from '#/engine/bot/BotTravel.js';
+import { findReachableLoc, findReachableNpc, npcMatchesName } from '#/engine/bot/BotAction.js';
+import { findLocApproach, findNpcApproach, findTileRoute, botPathCost } from '#/engine/bot/BotNavigation.js';
 import Player from '#/engine/entity/Player.js';
 import Npc from '#/engine/entity/Npc.js';
+import LocType from '#/cache/config/LocType.js';
 import Loc from '#/engine/entity/Loc.js';
 import InvType from '#/cache/config/InvType.js';
 import { Inventory } from '#/engine/Inventory.js';
@@ -49,7 +53,6 @@ import type { SkillStep } from '#/engine/bot/BotKnowledge.js';
 import { getMissingPurchases, STARTING_COINS } from '#/engine/bot/BotNeeds.js';
 import type { Purchase } from '#/engine/bot/BotNeeds.js';
 import type { BotTaskDebugInfo } from '#/engine/bot/debug/BotDebugTypes.js';
-import { BotDebugService } from '#/engine/bot/debug/BotDebugService.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -132,11 +135,39 @@ const BOT_BANKS: ReadonlyArray<[number, number, number]> = [
 
 /**
  * Returns the [x, z, level] tuple of the bank closest to the player's
- * current tile, using Chebyshev distance.  Tasks should call this once
+ * current tile, using reachable local paths and estimated native travel costs. Call once
  * per banking state entry rather than hard-coding a single bank.
  */
+/** Exact local costs and native travel requirements; remote land costs remain estimates. */
+function bankChoices(player: Player, reference?: [number, number, number]): [number, number, number][] {
+    const candidates: { bank: [number, number, number]; cost: number }[] = [];
+    for (const bank of BOT_BANKS) {
+        if (onTutorialIsland(player.x, player.z) !== onTutorialIsland(bank[0], bank[1])) continue;
+        const travel = chooseTravel(player, bank[0], bank[1]);
+        if (!['land', 'ship', 'tunnel'].includes(travel.mode)) continue;
+        const distance = Math.max(Math.abs(bank[0] - player.x), Math.abs(bank[1] - player.z));
+        let cost = distance + (bank[2] === player.level ? 0 : 100);
+        if (bank[2] === player.level && distance <= 60) {
+            const route = findTileRoute(player.level, player.x, player.z, bank[0], bank[1]);
+            if (!route) continue;
+            cost = botPathCost(player.x, player.z, route.path);
+        } else if (travel.legs.length) {
+            let x = player.x, z = player.z;
+            cost = 0;
+            for (const leg of travel.legs) {
+                cost += Math.max(Math.abs(x - leg.from.x), Math.abs(z - leg.from.z)) + 25 + leg.fare;
+                x = leg.to.x; z = leg.to.z;
+            }
+            cost += Math.max(Math.abs(x - bank[0]), Math.abs(z - bank[1]));
+        }
+        if (reference) cost += Math.max(Math.abs(bank[0] - reference[0]), Math.abs(bank[1] - reference[1]));
+        candidates.push({ bank, cost });
+    }
+    return candidates.sort((a, b) => a.cost - b.cost).map(candidate => candidate.bank);
+}
+
 export function nearestBank(player: Player): [number, number, number] {
-    return nearestBankTo(player.x, player.z);
+    return bankChoices(player)[0] ?? nearestBankTo(player.x, player.z);
 }
 
 /**
@@ -288,49 +319,48 @@ export { WIND_SPELLS, pickBestWindSpell, RangedBowsByLevel, bestRangedBow, Range
  *      Works at ALL banks.  Avoids NPC name ambiguity entirely.
  *   2. Banker NPC by prefix 'banker' (Lumbridge 2nd floor, Draynor, Varrock…).
  *   3. Banker NPC by prefix 'kharidbanker' (Al Kharid — debug name starts with 'kharid').
- *   4. Direct fallback: no interactive entity found but bot is already at the bank
- *      tile — proceed to deposit anyway (deposit functions work directly on
- *      inventory objects and do NOT require the bank UI to be open).
+ *   4. Hold another available bank destination when local services are unreachable.
  *
  * Pass null for the stuck detector to use only shared navigation recovery.
  *
  * Returns:
  *   'walk'   — still navigating, caller should return for this tick
- *   'ready'  — interaction queued (or fallback triggered), set cooldown + state
- *   'direct' — fallback: skip interaction, deposit immediately
+ *   'ready'  — a native bank interaction is queued; set cooldown + state
+ * The legacy 'direct' type remains for existing callers but is never returned.
  */
+type BankTrip = { owner: unknown; destination: [number, number, number]; unavailable: Set<string>; lastFailures: number };
+const bankTrips = new WeakMap<Player, BankTrip>();
+
 export function advanceBankWalk(
     player: Player,
     stuckDetector: StuckDetector | null,
     activityCoord?: [number, number, number],
 ): 'walk' | 'ready' | 'direct' {
-    const [bx, bz, bl] = activityCoord
-        ? nearestBankTo(activityCoord[0], activityCoord[1])
-        : nearestBank(player);
+    const bot = (player as any)._bot;
+    let trip = bankTrips.get(player);
+    if (!trip || trip.owner !== bot?.activeTask) {
+        const destination = bankChoices(player, activityCoord)[0];
+        if (!destination) { bot?.deferCurrentTask('no available bank journey'); return 'walk'; }
+        trip = { owner: bot?.activeTask, destination, unavailable: new Set(), lastFailures: 0 };
+        bankTrips.set(player, trip);
+    }
+    const alternative = () => {
+        trip!.unavailable.add(trip!.destination.join(','));
+        const next = bankChoices(player, activityCoord).find(bank => !trip!.unavailable.has(bank.join(',')));
+        if (!next) bot?.deferCurrentTask('no reachable bank service');
+        else { trip!.destination = next; stuckDetector?.reset(); }
+    };
+    // Preserve the task's bounded retry budget while choosing another service.
+    const failures = bot?.navigation.failures ?? 0;
+    if (failures >= 2 && failures > trip.lastFailures) alternative();
+    trip.lastFailures = failures;
+    if (bot?.activeTask?.interrupted) return 'walk';
+    const [bx, bz, bl] = trip.destination;
 
     if (!isNear(player, bx, bz, 3, bl)) {
         // Still walking — drive bot all the way to the bank coord (which should be
         // inside the building) before the booth search activates.
-
-
-
-        if (!stuckDetector || !stuckDetector.check(player, bx, bz)) {
-            walkTo(player, bx, bz, bl);
-        } else if (stuckDetector.desperatelyStuck) {
-            teleportNear(player, bx, bz, bl);
-            stuckDetector.reset();
-            try {
-                const bot = (player as any)._bot;
-                if (bot?.name) BotDebugService.noteRecovery(bot.name, 'teleport');
-            } catch {
-                /* debug hook must never affect gameplay */
-            }
-        } else {
-            // Clear existing (bad) waypoints so the hasWaypoints guard in
-            // walkTo() doesn't block the detour recalculation.
-            player.clearWaypoints();
-            walkTo(player, bx + randInt(-4, 4), bz + randInt(-4, 4), bl);
-        }
+        walkTo(player, bx, bz, bl);
         return 'walk';
     }
 
@@ -338,32 +368,35 @@ export function advanceBankWalk(
     // Search radius 6 — large enough to find booths across the floor but small
     // enough not to reach through the walls of the building from outside.
     // The bot is already at the interior coord so no wall-pierce is possible.
-    const booth = findLocByName(player.x, player.z, player.level, 'bankbooth', 6);
+    const booth = findReachableLoc(player, 6, loc => LocType.get(loc.type).debugname?.startsWith('bankbooth') ?? false);
     if (booth) {
-        if (!isNear(player, booth.x, booth.z, 1, booth.level)) {
-            walkTo(player, booth.x, booth.z, booth.level);
+        if (!player.inOperableDistance(booth)) {
+            const approach = findLocApproach(player, booth)!;
+            walkTo(player, approach.x, approach.z, booth.level);
             return 'walk';
         }
+        bankTrips.delete(player);
         interactLocOp(player, booth, 2); // op2 = Use-quickly → @openbank, no dialog
         return 'ready';
     }
 
     // ── Fallback: banker NPC ──────────────────────────────────────────────────
     // Al Kharid bankers have debug names starting with 'kharidbanker', not 'banker'.
-    const banker = findNpcByPrefix(player.x, player.z, player.level, 'banker', 10) ?? findNpcByPrefix(player.x, player.z, player.level, 'kharidbanker', 10);
+    const banker = findReachableNpc(player, 10, npc => npcMatchesName(npc, 'banker') || npcMatchesName(npc, 'kharidbanker'));
     if (banker) {
-        if (!isNear(player, banker.x, banker.z, 3, banker.level)) {
-            walkTo(player, banker.x, banker.z, banker.level);
+        if (!player.inOperableDistance(banker)) {
+            const approach = findNpcApproach(player, banker)!;
+            walkTo(player, approach.x, approach.z, banker.level);
             return 'walk';
         }
+        bankTrips.delete(player);
         interactNpcOp(player, banker, 3); // op3 = Bank on standard bankers
         return 'ready';
     }
 
-    // ── Ultimate fallback: deposit without UI interaction ─────────────────────
-    // Deposit functions use player.getInventory(bankInvId()) directly — no open
-    // bank UI required.  Only reached if no booth or NPC is visible.
-    return 'direct';
+    // This bank has no reachable service. Hold another destination for the trip.
+    alternative();
+    return 'walk';
 }
 
 // ── StuckDetector ─────────────────────────────────────────────────────────────

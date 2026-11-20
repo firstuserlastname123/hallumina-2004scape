@@ -2,8 +2,7 @@ import type Obj from '#/engine/entity/Obj.js';
 import Component from '#/cache/config/Component.js';
 import { getWorld } from '#/engine/bot/BotWorld.js';
 import { pollObstacle } from '#/engine/bot/BotObstacles.js';
-import { findPathToEntity, reachedEntity } from '#/engine/GameMap.js';
-import { validateBotPath } from '#/engine/bot/BotNavigation.js';
+import { findNpcApproach, botPathCost } from '#/engine/bot/BotNavigation.js';
 import {
     BotTask,
     Player,
@@ -46,7 +45,6 @@ import {
 import NpcType from '#/cache/config/NpcType.js';
 import { Interfaces, GRIMY_HERB_MAP, SkillProgression } from '#/engine/bot/BotKnowledge.js';
 import { hasAllTools, hasStepTool } from '#/engine/bot/BotNeeds.js';
-import { CoordGrid } from '#/engine/CoordGrid.js';
 import { NpcStat } from '#/engine/entity/NpcStat.js';
 import ScriptState from '#/engine/script/ScriptState.js';
 import type { BotTaskDebugInfo } from '#/engine/bot/debug/BotDebugTypes.js';
@@ -114,6 +112,7 @@ export class CombatTask extends BotTask {
 
     private interactTicks = 0;
     private approachTicks = 0;
+    private approachAnchor: { x: number; z: number; best: number } | null = null;
     private lastXp = 0;
     private scanFail = 0;
     private blockedCandidate: Npc | null = null;
@@ -485,6 +484,11 @@ export class CombatTask extends BotTask {
             this.currentNpc = npc;
             this._selectStyle(player);
             interactNpcOp(player, npc, 2);
+            const approach = findNpcApproach(player, npc);
+            player.clearWaypoints();
+            if (approach?.path.length) player.queueWaypoints(approach.path);
+            this.approachAnchor = { x: npc.x, z: npc.z,
+                best: Math.max(Math.abs(player.x - npc.x), Math.abs(player.z - npc.z)) };
             this.state = 'interact';
             this.interactTicks = this.approachTicks = this.scanFail = 0;
             this.lastXp = this._meleeXp(player);
@@ -542,6 +546,23 @@ export class CombatTask extends BotTask {
             this.lastXp = xp;
             const operable = player.inOperableDistance(npc);
             if (operable) this.approachTicks = 0;
+            else {
+                // Credit actual travel toward the acquired position, never NPC
+                // movement toward a stationary bot or a freshly queued route.
+                const anchor = this.approachAnchor;
+                const distance = anchor ? Math.max(Math.abs(player.x - anchor.x), Math.abs(player.z - anchor.z)) : Infinity;
+                if (anchor && distance < anchor.best - 1) { anchor.best = distance; this.approachTicks = 0; }
+                // Client-route mode otherwise uses a naive NPC chase and loses
+                // the legal approach found by the selector. Repath only between
+                // attempts; leave native rounds and active routes alone.
+                if (!player.hasWaypoints() && !player.delayed && !player.activeScript && this.interactTicks % 4 === 0) {
+                    const route = findNpcApproach(player, npc);
+                    if (route?.path.length) {
+                        if (!player.hasInteraction()) interactNpcOp(player, npc, 2);
+                        player.queueWaypoints(route.path);
+                    }
+                }
+            }
             if (this.approachTicks >= INTERACT_TIMEOUT || this.interactTicks >= INTERACT_TIMEOUT * 4) {
                 this.unreachableNpcs.set(npc.nid, player.playtime + 100);
                 if (this.unreachableNpcs.size > 64) this.unreachableNpcs.delete(this.unreachableNpcs.keys().next().value!);
@@ -622,6 +643,7 @@ export class CombatTask extends BotTask {
         this.state = 'walk';
         this.interactTicks = 0;
         this.approachTicks = 0;
+        this.approachAnchor = null;
         this.lastXp = 0;
         this.scanFail = 0;
         this.currentNpc = null;
@@ -701,18 +723,9 @@ export class CombatTask extends BotTask {
         let cost = Infinity;
         for (const npc of candidates.slice(0, 12)) {
             if (player.inOperableDistance(npc)) return npc;
-            const path = findPathToEntity(player.level, player.x, player.z, npc.x, npc.z, player.width, npc.width, npc.length);
-            if (!path.length) continue;
-            const end = CoordGrid.unpackCoord(path[path.length - 1]);
-            if (!reachedEntity(player.level, end.x, end.z, npc.x, npc.z, npc.width, npc.length, player.width) ||
-                validateBotPath(player.level, player.x, player.z, path) !== 'ok') continue;
-            let previous = { x: player.x, z: player.z };
-            let steps = 0;
-            for (const point of path) {
-                const next = CoordGrid.unpackCoord(point);
-                steps += Math.max(Math.abs(next.x - previous.x), Math.abs(next.z - previous.z));
-                previous = next;
-            }
+            const route = findNpcApproach(player, npc);
+            if (!route) continue;
+            const steps = botPathCost(player.x, player.z, route.path);
             if (steps < cost) {
                 cost = steps;
                 best = npc;

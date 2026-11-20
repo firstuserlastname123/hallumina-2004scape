@@ -28,12 +28,78 @@
  *   - Maintains a short-lived failed-edge cache
  */
 
-import { CollisionType } from '@2004scape/rsmod-pathfinder';
-import { canTravel, isMapBlocked, botWalkPath, botFindPath, findPathToLoc, reachedLoc } from '#/engine/GameMap.js';
+import { findLocalRoute } from '#/engine/bot/BotLocalRoute.js';
+import { CollisionFlag, CollisionType } from '@2004scape/rsmod-pathfinder';
+import { canTravel, isMapBlocked, botFindPath, findPathToLoc, reachedLoc, findPathToEntity, reachedEntity } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
 import LocType from '#/cache/config/LocType.js';
 import type Loc from '#/engine/entity/Loc.js';
 import type Player from '#/engine/entity/Player.js';
+import type Npc from '#/engine/entity/Npc.js';
+
+export type BotApproach = { x: number; z: number; path: Uint32Array };
+
+/** Walking tiles, rather than the number of compressed turns. */
+export function botPathCost(srcX: number, srcZ: number, path: Uint32Array): number {
+    let cost = 0;
+    for (const point of path) {
+        const x = (point >> 14) & 0x3fff;
+        const z = point & 0x3fff;
+        cost += Math.max(Math.abs(x - srcX), Math.abs(z - srcZ));
+        srcX = x; srcZ = z;
+    }
+    return cost;
+}
+
+/** Exact local tile route. A move-near endpoint is not proof of reachability. */
+export function findTileRoute(level: number, srcX: number, srcZ: number, x: number, z: number): BotApproach | null {
+    if (isBotTileBlocked(level, x, z)) return null;
+    if (srcX === x && srcZ === z) return { x, z, path: new Uint32Array() };
+    const path = trimPathAtCsvBlock(level, botFindPath(level, srcX, srcZ, x, z), srcX, srcZ);
+    // An empty native/CSV-trimmed prefix is not proof that every route fails.
+    if (path.length) {
+        const end = path[path.length - 1];
+        if (((end >> 14) & 0x3fff) === x && (end & 0x3fff) === z && validateBotPath(level, srcX, srcZ, path) === 'ok') return { x, z, path };
+    }
+    const detour = findLocalRoute(level, srcX, srcZ, x, z,
+        (x, z, nx, nz) => canBotStep(level, x, z, nx, nz), (tx, tz) => tx === x && tz === z);
+    return detour ? { x, z, path: detour } : null;
+}
+
+/** Legal entity face, shared by gathering, shops and melee selection. */
+export function findNpcApproach(player: Player, npc: Npc): BotApproach | null {
+    if (player.level !== npc.level || !npc.isActive) return null;
+    if (player.inOperableDistance(npc)) return { x: player.x, z: player.z, path: new Uint32Array() };
+    const path = trimPathAtCsvBlock(player.level, findPathToEntity(player.level, player.x, player.z,
+        npc.x, npc.z, player.width, npc.width, npc.length), player.x, player.z);
+    if (path.length) {
+        const end = path[path.length - 1];
+        const x = (end >> 14) & 0x3fff, z = end & 0x3fff;
+        if (reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width) &&
+            validateBotPath(player.level, player.x, player.z, path) === 'ok') return { x, z, path };
+    }
+    const detour = findLocalRoute(player.level, player.x, player.z, npc.x, npc.z,
+        (x, z, nx, nz) => canBotStep(player.level, x, z, nx, nz),
+        (x, z) => reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width), Math.max(npc.width, npc.length));
+    if (!detour?.length) return null;
+    const end = detour[detour.length - 1];
+    return { x: (end >> 14) & 0x3fff, z: end & 0x3fff, path: detour };
+}
+
+/** Bounded local choice; never treats a nearby but disconnected object as usable. */
+export function chooseReachable<T extends { x: number; z: number }>(player: Player, candidates: T[],
+    approach: (target: T) => BotApproach | null, penalty: (target: T) => number = () => 0): { target: T; approach: BotApproach; cost: number } | null {
+    const distance = (target: T) => Math.max(Math.abs(target.x - player.x), Math.abs(target.z - player.z));
+    candidates.sort((a, b) => distance(a) - distance(b));
+    let best: { target: T; approach: BotApproach; cost: number } | null = null;
+    for (const target of candidates.slice(0, 24)) {
+        const route = approach(target);
+        if (!route) continue;
+        const cost = botPathCost(player.x, player.z, route.path) + penalty(target);
+        if (!best || cost < best.cost) best = { target, approach: route, cost };
+    }
+    return best;
+}
 
 /** A real, reachable operating position, respecting rotation and forceapproach. */
 export function findLocApproach(player: Player, loc: Loc): { x: number; z: number; path: Uint32Array } | null {
@@ -67,7 +133,8 @@ export function findLocApproach(player: Player, loc: Loc): { x: number; z: numbe
     candidates.sort((a, b) => Math.max(Math.abs(a.x - player.x), Math.abs(a.z - player.z)) -
         Math.max(Math.abs(b.x - player.x), Math.abs(b.z - player.z)));
     for (const tile of candidates) {
-        const route = accept(botFindPath(player.level, player.x, player.z, tile.x, tile.z));
+        const path = findTileRoute(player.level, player.x, player.z, tile.x, tile.z)?.path;
+        const route = path ? accept(path) : null;
         if (route) return route;
     }
     return null;
@@ -89,7 +156,7 @@ export function findLocApproach(player: Player, loc: Loc): { x: number; z: numbe
 export function canBotStep(level: number, x: number, z: number, nx: number, nz: number): boolean {
     const dx = nx - x;
     const dz = nz - z;
-    if (!canTravel(level, x, z, dx, dz, 1, 0, CollisionType.NORMAL)) return false;
+    if (!canTravel(level, x, z, dx, dz, 1, CollisionFlag.PLAYER, CollisionType.NORMAL)) return false;
     if (BotCollisionMap.isCsvBlocked(level, nx, nz)) return false;
     return true;
 }
@@ -186,7 +253,7 @@ export function explainBlockedStep(level: number, x: number, z: number, nx: numb
     if (isMapBlocked(nx, nz, level)) return `WALK_BLOCKED(${nx},${nz})`;
     const dx = nx - x;
     const dz = nz - z;
-    if (!canTravel(level, x, z, dx, dz, 1, 0, CollisionType.NORMAL)) return `edge_blocked(${x},${z})->(${nx},${nz})`;
+    if (!canTravel(level, x, z, dx, dz, 1, CollisionFlag.PLAYER, CollisionType.NORMAL)) return `edge_blocked(${x},${z})->(${nx},${nz})`;
     return 'no_issue';
 }
 
@@ -218,11 +285,10 @@ export function validateBotPath(level: number, srcX: number, srcZ: number, path:
 
 /**
  * Check whether there is any reachable path from src to dest.
- * Runs a full botWalkPath — use sparingly, not every tick.
+ * Requires an exact, collision-safe endpoint — use sparingly, not every tick.
  */
 export function canBotTravel(level: number, srcX: number, srcZ: number, destX: number, destZ: number): boolean {
-    const path = botWalkPath(level, srcX, srcZ, destX, destZ);
-    return path.length > 0;
+    return findTileRoute(level, srcX, srcZ, destX, destZ) !== null;
 }
 
 export { BotMovementMonitor } from '#/engine/bot/BotMovementMonitor.js';

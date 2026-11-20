@@ -27,3 +27,7 @@ test('destination jitter, dynamic routes and bounded subtask recovery', t => run
 test('doors, locked barriers, stairs, resources and social destinations on the r254 map', t => runtimeFixture('bot-environment.ts', t));
 
 test('native transport, risk choices and long land journeys on r254', t => runtimeFixture('bot-journeys.ts', t));
+
+test('reachable alternatives, retained native approaches and observed service outcomes', t => runtimeFixture('bot-intelligent-navigation.ts', t));
+
+test('native building exits, one-way doors and dungeon entrances on r254', t => runtimeFixture('bot-native-exits.ts', t));

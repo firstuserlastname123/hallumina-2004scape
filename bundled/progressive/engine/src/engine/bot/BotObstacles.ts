@@ -1,3 +1,4 @@
+import VarPlayerType from '#/cache/config/VarPlayerType.js';
 import LocType from '#/cache/config/LocType.js';
 import Player from '#/engine/entity/Player.js';
 import Loc from '#/engine/entity/Loc.js';
@@ -10,8 +11,8 @@ import type { BotPlayer } from '#/engine/bot/BotPlayer.js';
 import { BotLog } from '#/engine/bot/BotLog.js';
 
 type Crossing = { level: number; underground: boolean };
-type Attempt = { loc: Loc; type: number; angle: number; shape: number; tick: number; owner: unknown;
-    sourceX: number; sourceZ: number; crossing?: Crossing };
+type Attempt = { loc: Loc; op: 1 | 2 | 3 | 4 | 5; type: number; angle: number; shape: number; tick: number; owner: unknown;
+    sourceX: number; sourceZ: number; lastX: number; lastZ: number; progressTick: number; femiHelp?: number; crossing?: Crossing };
 type State = { pending?: Attempt; failed: Map<string, number> };
 const states = new WeakMap<Player, State>();
 const WAIT_TICKS = 25;
@@ -59,12 +60,35 @@ export function pollObstacle(player: Player): boolean {
             Math.sign(player.x-a.loc.x-(a.loc.width-1)/2) !== Math.sign(a.sourceX-a.loc.x-(a.loc.width-1)/2));
     const complete = a.crossing ? player.level === a.crossing.level && (player.z > 4100) === a.crossing.underground :
         changed && (crossed || rectangleCrossed || canBotStep(a.loc.level, a.loc.x, a.loc.z, a.loc.x + dx, a.loc.z + dz));
-    if (complete) {
+    if (complete && !player.delayed && !player.activeScript) {
         s.pending = undefined;
         BotLog.event('debug', player.username, a.crossing ? 'transition_completed' : 'gate_opened', `Obstacle passed at (${a.loc.x},${a.loc.z},${a.loc.level})`);
         return false;
     }
-    if (World.currentTick - a.tick < WAIT_TICKS) return true;
+    // The gate's first native dialogue may finish Femi's prerequisite instead
+    // of opening it. Observe that exact native result and permit a fresh click.
+    if (a.femiHelp !== undefined && player.vars[VarPlayerType.getId('femi_help')] > a.femiHelp &&
+        !player.delayed && !player.activeScript) {
+        s.pending = undefined;
+        BotLog.event('debug', player.username, 'obstacle_prerequisite', 'Native Femi dialogue completed; retry gate');
+        return false;
+    }
+    if ((player.x !== a.lastX || player.z !== a.lastZ) && player.target === a.loc) a.progressTick = World.currentTick;
+    a.lastX = player.x; a.lastZ = player.z;
+    // Native queues retain the tail on overflow. Continue a safe prefix from
+    // the actual position rather than dropping early turns in a long approach.
+    if (!player.delayed && !player.activeScript && !player.hasWaypoints() &&
+        (!player.hasInteraction() || player.target === a.loc) && a.loc.isValid() && !player.inOperableDistance(a.loc)) {
+        const approach = findLocApproach(player, a.loc);
+        if (approach?.path.length) {
+            if (!player.hasInteraction()) player.setInteraction(Interaction.ENGINE, a.loc, ServerTriggerType.APLOC1 + a.op - 1);
+            player.queueWaypoints(approach.path.slice(0, player.waypoints.length));
+        }
+    }
+    // Approaching a legal face can take longer than the opening itself. Only
+    // observed movement extends the idle budget; a click is not progress.
+    if (World.currentTick - a.tick < 200 &&
+        (player.delayed || player.activeScript || World.currentTick - a.progressTick < WAIT_TICKS)) return true;
     remember(s, key(a.loc, a.type, a.angle, a.shape));
     s.pending = undefined;
     if (player.target === a.loc) { player.clearPendingAction(); player.clearWaypoints(); }
@@ -85,11 +109,14 @@ export function tryObstacle(player: Player, loc: Loc, op: 1 | 2 | 3 | 4 | 5, cro
     player.clearWaypoints();
     player.moveSpeed = MoveSpeed.WALK;
     if (!player.setInteraction(Interaction.ENGINE, loc, ServerTriggerType.APLOC1 + op - 1)) return false;
-    if (approach.path.length) player.queueWaypoints(approach.path);
-    s.pending = { loc, type: loc.type, angle: loc.angle, shape: loc.shape, tick: World.currentTick,
+    if (approach.path.length) player.queueWaypoints(approach.path.slice(0, player.waypoints.length));
+    s.pending = { loc, op, type: loc.type, angle: loc.angle, shape: loc.shape, tick: World.currentTick,
         // A legitimate approach can circle to the opposite face. Verify passage
         // from that operating position, rather than the side where we clicked.
-        sourceX: approach.x, sourceZ: approach.z, owner: (player as Player & { _bot?: BotPlayer })._bot?.activeTask, crossing };
+        sourceX: approach.x, sourceZ: approach.z,
+        lastX: player.x, lastZ: player.z, progressTick: World.currentTick,
+        femiHelp: LocType.get(loc.type).debugname === 'gnome_areagate' ? player.vars[VarPlayerType.getId('femi_help')] : undefined,
+        owner: (player as Player & { _bot?: BotPlayer })._bot?.activeTask, crossing };
     BotLog.event('debug', player.username, crossing ? 'transition_attempt' : 'gate_attempt', `Interact op${op} at (${loc.x},${loc.z},${loc.level})`);
     return true;
 }
