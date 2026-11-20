@@ -4,6 +4,7 @@ const DESTINATION_JITTER_TILES = 4;
 /** Per-task retry budget. Retargeting never substitutes for observed progress. */
 export class BotRouteRetry {
     private destination = '';
+    private readonly recentSegments: { x: number; z: number; level: number; until: number }[] = [];
     private target: { x: number; z: number; level: number } | null = null;
     private requested: { x: number; z: number; level: number; distance: number } | null = null;
     private bestDistance = Infinity;
@@ -75,6 +76,17 @@ export class BotRouteRetry {
             best: srcLevel === level ? Math.max(Math.abs(srcX - x), Math.abs(srcZ - z)) : Infinity };
     }
 
+    /** Short-lived route memory discourages returning to a recently abandoned segment. */
+    segmentPenalty(x: number, z: number, level: number, tick: number): number {
+        return this.recentSegments.some(p => p.until > tick && p.level === level &&
+            Math.max(Math.abs(p.x - x), Math.abs(p.z - z)) <= 8) ? 100 : 0;
+    }
+
+    rememberSegment(x: number, z: number, level: number, tick: number): void {
+        while (this.recentSegments.length && (this.recentSegments[0].until <= tick || this.recentSegments.length >= 16)) this.recentSegments.shift();
+        this.recentSegments.push({ x, z, level, until: tick + 100 });
+    }
+
     clearIntermediate(): void { this.intermediate = null; }
     get intermediateTarget(): Readonly<{ x: number; z: number; level: number }> | null { return this.intermediate; }
 
@@ -100,6 +112,7 @@ export class BotRouteRetry {
     reset(): void {
         this.meaningfulTravelTick = -Infinity;
         this.destination = '';
+        this.recentSegments.length = 0;
         this.target = null;
         this.requested = null;
         this.bestDistance = Infinity;

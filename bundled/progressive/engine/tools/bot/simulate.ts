@@ -66,6 +66,10 @@ combatPrototype._findTargetNpc = function (p: InstanceType<typeof Player>) {
     return result;
 };
 let scriptNpc: import('#/engine/entity/Npc.js').default | undefined;
+const navigationFailures: Record<string, number> = {};
+const failureSamples: object[] = [];
+const services = { bankOpened: 0, shopOpened: 0 };
+const modals = new WeakMap<object, number>();
 const counters = { oscillation: 0, stationaryOscillation: 0, stuck: 0, timeoutMessages: 0, timeoutDiagnostics: 0, missingSheepMessages: 0, logLines: 0, logBytes: 0, errors: 0, blockedStepsQueued: 0, noOpPathsQueued: 0,
     routesQueued: 0, activeRoutesCleared: 0, pathFailures: 0, noProgress: 0, taskDeferrals: 0, subtaskDeferrals: 0, subtasksScheduled: 0 };
 // Same observers are copied to both implementations. Script starts include the
@@ -192,6 +196,12 @@ if (logModule) {
 const originalLog = BotPlayer.prototype.log;
 BotPlayer.prototype.log = function (message: string, ...args: any[]) {
     const key = args[1];
+    if (['path_failed', 'no_progress', 'obstacle_failed', 'navigation_stuck', 'navigation_oscillation'].includes(key)) {
+        const name = this.activeTask?.name ?? 'unknown';
+        navigationFailures[`${name}:${key}`] = (navigationFailures[`${name}:${key}`] ?? 0) + 1;
+        if (failureSamples.length < 1000) failureSamples.push({ tick: World.currentTick, name: this.name, task: name,
+            event: key, at: [this.player.x, this.player.z, this.player.level], destination: this.navigation.destinationLabel });
+    }
     if (key === 'path_failed') counters.pathFailures++;
     if (key === 'no_progress') counters.noProgress++;
     if (key === 'task_deferred') {
@@ -285,6 +295,12 @@ BotManager.tick = () => {
     for (const bot of population()) {
         if (!tasksSeen.has(bot.name)) tasksSeen.set(bot.name, new Set());
         if (bot.currentTask) tasksSeen.get(bot.name)!.add(bot.currentTask.name);
+        const modal = bot.player.modalMain;
+        if (modals.get(bot.player) !== modal) {
+            if (modal === 5292) services.bankOpened++;
+            if (modal === 3824) services.shopOpened++;
+            modals.set(bot.player, modal);
+        }
         const name=bot.activeTask?.name??'Idle';
         const state=String((bot.activeTask as any)?.state??'');
         if(name==='Idle') participation.idleBotTicks++;
@@ -384,8 +400,8 @@ const report = { melee, seed, ticks, simulatedMinutes: ticks * 0.6 / 60, interva
     revision: Environment.ENGINE_REVISION,
     config: { xprate: Environment.NODE_XPRATE, progressiveXp: Environment.NODE_PROGRESSIVE_XP, debug: Environment.BOT_DEBUG_ENABLED,
         logLevel: process.env.BOT_LOG_LEVEL ?? 'info', verify: Environment.BUILD_VERIFY, verifyFolder: Environment.BUILD_VERIFY_FOLDER, verifyPack: Environment.BUILD_VERIFY_PACK },
-    active, counters, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
-        'tasks/CombatTask.ts', 'BotGoalPlanner.ts', 'BotAction.ts', 'BotNavigation.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
+    active, counters, navigationFailures, failureSamples, services, obstacles, participation, transportLegs, nativeScriptXpGained: [...nativeXp.values()].reduce((s,x)=>s+x,0), taskCompletions: completions, productionFingerprints: Object.fromEntries([
+        'tasks/CombatTask.ts', 'BotGoalPlanner.ts', 'BotAction.ts', 'BotNavigation.ts', 'BotLocalRoute.ts', 'BotObstacles.ts', 'BotPlayer.ts', 'BotRouteRetry.ts', 'BotDialogue.ts', 'BotTravel.ts', 'tasks/BotTaskBase.ts', 'tasks/WoodcuttingTask.ts', 'tasks/MiningTask.ts', 'tasks/FishingTask.ts', 'tasks/ShopTripTask.ts', 'tasks/SocialTask.ts', 'tasks/AgilityTask.ts'
     ].map(file => [file, fs.existsSync(`src/engine/bot/${file}`) ? createHash('sha256').update(fs.readFileSync(`src/engine/bot/${file}`)).digest('hex') : null])), eventCounts: logModule?.BotLog.counts ?? null, worldTiming: timing(worldTimes), botTiming: timing(botTimes),
     steadyWorldTiming: timing(worldTimes.slice(20)), steadyBotTiming: timing(botTimes.slice(20)),
     xpGained: bots.reduce((sum, b) => sum + b.xpGained, 0), levelsGained: bots.reduce((sum, b) => sum + b.levelsGained, 0),

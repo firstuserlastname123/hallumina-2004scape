@@ -51,10 +51,10 @@ import NpcType from '#/cache/config/NpcType.js';
 import LocType from '#/cache/config/LocType.js';
 import InvType from '#/cache/config/InvType.js';
 import { getWorld } from '#/engine/bot/BotWorld.js';
-import { botWalkPath, botFindPath } from '#/engine/GameMap.js';
+import { botWalkPath } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
 import { pollObstacle, hasPendingObstacle, isObstacleSuppressed, tryObstacle } from '#/engine/bot/BotObstacles.js';
-import { trimPathAtCsvBlock, findNearestWalkableTile, canBotStep } from '#/engine/bot/BotNavigation.js';
+import { trimPathAtCsvBlock, findNearestWalkableTile, isBotTileBlocked, findTileRoute, botPathCost, validateBotPath, findLocApproach, findNpcApproach, chooseReachable } from '#/engine/bot/BotNavigation.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
 import Obj from '#/engine/entity/Obj.js';
@@ -210,6 +210,11 @@ type GatewayRegion = {
     readonly unsupported?: boolean;
 };
 
+// These overlapping mainland polygons can describe opposing virtual crossings.
+// Native collision routes ordinary roads and bridges; keep the other verified
+// terrain corridors, physical entrances, toll bypass and floor transitions.
+const COLLISION_ROUTED_GATEWAYS = new Set(['Lumbridge', 'RiverLumSouth', 'RiverLumSouth2', 'RiverLumBarb', 'RiverLumNorth', 'DraynorFence']);
+
 const GATEWAY_REGIONS: GatewayRegion[] = [
     {
         // ── Lumbridge castle ──────────────────────────────────────────────────
@@ -223,10 +228,7 @@ const GATEWAY_REGIONS: GatewayRegion[] = [
         // Fix: Force bots to enter and leave through the north of the castle.
         // If they head for Draynor, they automatically pick the west most tile.
         name: 'Lumbridge',
-        destInRegion: (x, z, l) => checkRegion(x, z, l, [
-            'Lumbridge',
-            'MisthalinEast',
-            'Desert']),
+        destInRegion: (x, z, l) => checkRegion(x, z, l, ['Lumbridge', 'MisthalinEast', 'Desert']),
         approach: [[3200, 3238], [3228, 3238]],
         exit: [[3201, 3237], [3228, 3237]]
     },
@@ -1715,92 +1717,56 @@ function _queueBotPath(player: Player, path: Uint32Array): boolean {
     return true;
 }
 
-/**
- * Raw pathfinding toward a single tile: accurate → relaxed → swept-angle → naive.
- * Does NOT do gateway or corridor pre-routing.  Call walkTo() for normal movement.
- *
- * Long-distance fallback strategy (dist > 100):
- *   1. Try the direct 90-tile midpoint (existing behaviour).
- *   2. If that fails, sweep ±20 °, ±40 °, ±60 ° around the direct heading at
- *      the same 90-tile distance.  A modest angle offset finds a reachable tile
- *      around a large building without straying far off course.
- *   3. If still failing, repeat the sweep at shorter (60-tile) segments.
- *
- * Final compass fallback (all midpoints failed):
- *   Try 8 compass directions at step sizes 50 → 25 → 15 tiles.
- *   Larger steps are necessary to actually clear a wide obstacle like a castle.
- */
+/** Rank safe path segments by walked cost and remaining travel, not compass order. */
 function _pathTowards(player: Player, destX: number, destZ: number): void {
-    const dx = destX - player.x;
-    const dz = destZ - player.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    const dx = destX - player.x, dz = destZ - player.z;
+    const dist = Math.hypot(dx, dz);
     if (dist < 1) return;
-
-    const baseAngle = Math.atan2(dz, dx);
-
+    const direct = findTileRoute(player.level, player.x, player.z, destX, destZ);
+    if (direct && _queueBotPath(player, direct.path)) return;
     if (dist <= 100) {
-        // Short hop — try direct path first
-        let path = botWalkPath(player.level, player.x, player.z, destX, destZ);
-        if (path.length === 0) path = botFindPath(player.level, player.x, player.z, destX, destZ);
-        if (path.length > 0) {
-            if (_queueBotPath(player, path)) return;
+        // Native move-near is useful when approaching a closed gate or a large
+        // obstacle. Check its actual endpoint, so a returned source tile never
+        // counts as movement or as proof the requested destination is reachable.
+        const path = trimPathAtCsvBlock(player.level, botWalkPath(player.level, player.x, player.z, destX, destZ), player.x, player.z);
+        if (path.length) {
+            const end = path[path.length - 1];
+            const remaining = Math.hypot(destX - ((end >> 14) & 0x3fff), destZ - (end & 0x3fff));
+            if (remaining < dist - 0.5 && validateBotPath(player.level, player.x, player.z, path) === 'ok' && _queueBotPath(player, path)) return;
         }
-        // Path is completely blocked — a door or gate is likely in the way.
-        // Try opening one within 8 tiles before falling back to the compass sweep.
-        // openNearbyGate only matches CLOSED doors (locs with Open/Walk-through ops
-        // but without Close ops), so an already-open gate is never double-interacted.
-        if (openGateToward(player, destX, destZ, 8)) return;
-    } else {
-        // Long distance — try midpoints at the direct heading then sweep outward
-        // so the pathfinder can find a clear intermediate tile around any obstacle
-        const segDist = Math.min(90, dist - 1);
-        for (const deg of [0, 20, -20, 40, -40, 60, -60]) {
-            const angle = baseAngle + (deg * Math.PI) / 180;
-            const midX = Math.round(player.x + Math.cos(angle) * segDist);
-            const midZ = Math.round(player.z + Math.sin(angle) * segDist);
-            if (BotCollisionMap.isCsvBlocked(player.level, midX, midZ)) continue;
-            let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length > 0) {
-                if (_queueBotPath(player, path)) return;
+        if (openGateToward(player, destX, destZ, 8, true)) return;
+        // A local inaccessible destination should yield to its retry budget.
+        if (dist <= 10) return;
+    }
+    const angle = Math.atan2(dz, dx);
+    let best: Uint32Array | null = null;
+    let bestCost = Infinity;
+    const endpoints = new Set<number>();
+    const bot = (player as any)._bot;
+    for (const length of [Math.min(90, dist - 1), 60, 25]) {
+        for (const offset of [0, 20, -20, 40, -40, 60, -60, 90, -90, 135, -135, 180]) {
+            const direction = angle + offset * Math.PI / 180;
+            const x = Math.round(player.x + Math.cos(direction) * length);
+            const z = Math.round(player.z + Math.sin(direction) * length);
+            let path = trimPathAtCsvBlock(player.level, botWalkPath(player.level, player.x, player.z, x, z), player.x, player.z);
+            if (!path.length) continue;
+            const end = path[path.length - 1];
+            if (endpoints.has(end)) continue;
+            endpoints.add(end);
+            const ex = (end >> 14) & 0x3fff, ez = end & 0x3fff;
+            if (ex === player.x && ez === player.z) continue;
+            if (validateBotPath(player.level, player.x, player.z, path) !== 'ok') {
+                const detour = findTileRoute(player.level, player.x, player.z, ex, ez);
+                if (!detour) continue;
+                path = detour.path;
             }
-        }
-        // Retry with shorter segments in case the 90-tile target is unreachable
-        for (const deg of [0, 20, -20, 40, -40, 60, -60]) {
-            const angle = baseAngle + (deg * Math.PI) / 180;
-            const midX = Math.round(player.x + Math.cos(angle) * 60);
-            const midZ = Math.round(player.z + Math.sin(angle) * 60);
-            if (BotCollisionMap.isCsvBlocked(player.level, midX, midZ)) continue;
-            let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length > 0) {
-                if (_queueBotPath(player, path)) return;
-            }
+            const remaining = Math.hypot(destX - ex, destZ - ez);
+            const cost = botPathCost(player.x, player.z, path) + remaining * 1.5 +
+                (bot?.navigation.segmentPenalty(ex, ez, player.level, bot.ticksAliveValue) ?? 0);
+            if (cost < bestCost) { best = path; bestCost = cost; }
         }
     }
-
-    // All directed midpoints failed — sweep 8 compass directions at increasing
-    // step sizes so the bot can escape wide obstacles, not just doorway-width ones
-    for (const step of [50, 25, 15]) {
-        for (const deg of [0, 45, -45, 90, -90, 135, -135, 180]) {
-            const angle = baseAngle + (deg * Math.PI) / 180;
-            const midX = Math.round(player.x + Math.cos(angle) * step);
-            const midZ = Math.round(player.z + Math.sin(angle) * step);
-            if (BotCollisionMap.isCsvBlocked(player.level, midX, midZ)) continue;
-            let path = botWalkPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length === 0) path = botFindPath(player.level, player.x, player.z, midX, midZ);
-            if (path.length > 0) {
-                if (_queueBotPath(player, path)) return;
-            }
-        }
-    }
-
-    // Absolute last resort: 1-tile naive step (skip if CSV-blocked)
-    const naiveX = player.x + Math.sign(dx);
-    const naiveZ = player.z + Math.sign(dz);
-    if (canBotStep(player.level, player.x, player.z, naiveX, naiveZ)) {
-        player.queueWaypoint(naiveX, naiveZ);
-    }
+    if (best && _queueBotPath(player, best)) bot?.navigation.rememberSegment(player.x, player.z, player.level, bot.ticksAliveValue);
 }
 
 /**
@@ -1878,6 +1844,18 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
         return;
     }
 
+    if (player.level === level && Math.max(Math.abs(player.x - destX), Math.abs(player.z - destZ)) <= 60) {
+        const direct = findTileRoute(level, player.x, player.z, destX, destZ);
+        if (direct) {
+            (player as any)._bot?.navigation.clearIntermediate();
+            player.clearPendingAction();
+            player.run = player.runenergy >= 3000 ? 1 : 0;
+            player.moveSpeed = MoveSpeed.WALK;
+            _queueBotPath(player, direct.path);
+            return;
+        }
+    }
+
     // Cancel any active engine interaction (setInteraction target) before setting
     // new waypoints.  Without this, processInteraction() re-routes the player back
     // toward the old target every tick, overriding the walkTo waypoints and causing
@@ -1900,7 +1878,7 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
     // it has already passed (notably the northern Al Kharid approach).
     const intermediate = (player as any)._bot?.navigation.intermediateTarget;
     if (intermediate && intermediate.level === player.level &&
-        Math.max(Math.abs(player.x - intermediate.x), Math.abs(player.z - intermediate.z)) > 5) {
+        Math.max(Math.abs(player.x - intermediate.x), Math.abs(player.z - intermediate.z)) > 0) {
         _pathTowards(player, intermediate.x, intermediate.z);
         return;
     }
@@ -1944,6 +1922,8 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
             if (approach[0].length < 2 || exit[0].length < 2) continue;
             let approachLevel = curr.approachLevel ?? 0;
             let exitLevel = curr.exitLevel ?? 0;
+            if (approachLevel === exitLevel && (approach[0][1] > 4100) === (exit[0][1] > 4100) &&
+                COLLISION_ROUTED_GATEWAYS.has(curr.name)) continue;
 
             // Only consider gateways where the destination
             // is in the region and the bot is outside.
@@ -2031,11 +2011,12 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
             // Not yet at the approach tile — walk toward it first.
             // If the requested destination is CSV-blocked or WALK_BLOCKED,
             // find the nearest walkable tile.
-            if (BotCollisionMap.isCsvBlocked(next[2], next[0], next[1])) {
+            if (isBotTileBlocked(next[2], next[0], next[1])) {
                 const alt = findNearestWalkableTile(next[2], next[0], next[1], 5);
                 if (!alt) return; // nowhere reachable near this destination
                 next[0] = alt.x;
                 next[1] = alt.z;
+                (player as any)._bot?.navigation.setIntermediate(next[0], next[1], next[2], player.x, player.z, player.level);
             }
             _pathTowards(player, next[0], next[1]);
 
@@ -2060,9 +2041,13 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
         // Walk inside the exit area as we may need to get through
         // more gateways before the last destination is reachable.
         // Make sure we actually get a walkable tile in the exit area.
-        if (BotCollisionMap.isCsvBlocked(nextExit[2], nextExit[0], nextExit[1])) {
+        if (isBotTileBlocked(nextExit[2], nextExit[0], nextExit[1])) {
             nextExit = closestBetween(gwExit, [player.x, player.z], [destX, destZ], nextExit[2]);
         }
+        const exitTile = findNearestWalkableTile(nextExit[2], nextExit[0], nextExit[1], 5);
+        if (!exitTile) return;
+        nextExit = [exitTile.x, exitTile.z, nextExit[2]];
+        (player as any)._bot?.navigation.setIntermediate(nextExit[0], nextExit[1], nextExit[2], player.x, player.z, player.level);
         _pathTowards(player, nextExit[0], nextExit[1]);
 
         try {
@@ -2790,6 +2775,39 @@ function _findLoc(cx: number, cz: number, level: number, radius: number, predica
     return best;
 }
 
+/** Local candidate collection is bounded by radius; reachability is checked only at selection. */
+export function nearbyLocs(player: Player, radius: number, predicate: (loc: Loc) => boolean): Loc[] {
+    const candidates: Loc[] = [];
+    const zones = Math.ceil(radius / 8) + 1;
+    for (let dx = -zones; dx <= zones; dx++) for (let dz = -zones; dz <= zones; dz++) {
+        const zone = getWorld().gameMap.getZone(player.x + dx * 8, player.z + dz * 8, player.level);
+        for (const loc of zone.getAllLocsSafe()) {
+            if (loc.level === player.level && loc.isValid() &&
+                Math.max(loc.x - player.x, player.x - (loc.x + loc.width - 1),
+                    loc.z - player.z, player.z - (loc.z + loc.length - 1), 0) <= radius && predicate(loc)) candidates.push(loc);
+        }
+    }
+    return candidates;
+}
+
+export function findReachableLoc(player: Player, radius: number, predicate: (loc: Loc) => boolean,
+    penalty: (loc: Loc) => number = () => 0): Loc | null {
+    return chooseReachable(player, nearbyLocs(player, radius, predicate), loc => findLocApproach(player, loc), penalty)?.target ?? null;
+}
+
+export function findReachableNpc(player: Player, radius: number, predicate: (npc: Npc) => boolean): Npc | null {
+    const candidates: Npc[] = [];
+    const zones = Math.ceil(radius / 8) + 1;
+    for (let dx = -zones; dx <= zones; dx++) for (let dz = -zones; dz <= zones; dz++) {
+        const zone = getWorld().gameMap.getZone(player.x + dx * 8, player.z + dz * 8, player.level);
+        for (const npc of zone.getAllNpcsSafe()) {
+            if (npc.isActive && npc.level === player.level &&
+                Math.max(Math.abs(npc.x - player.x), Math.abs(npc.z - player.z)) <= radius && predicate(npc)) candidates.push(npc);
+        }
+    }
+    return chooseReachable(player, candidates, npc => findNpcApproach(player, npc))?.target ?? null;
+}
+
 // ── Skills ────────────────────────────────────────────────────────────────────
 
 export function getLevel(player: Player, stat: PlayerStat): number {
@@ -3198,7 +3216,8 @@ export function setVarp(player: Player, varpName: string, varpId: number, varpVa
  * Returns true if an obstruction was found (interaction queued or walk started).
  */
 function interactNearbyLocByOps(player: Player, keyword: string, approach: number[], exit: number[]): boolean {
-    const loc = _findLoc(approach[0], approach[1], player.level, 5, loc => {
+    const loc = findReachableLoc(player, 10, loc => {
+        if (Math.max(Math.abs(loc.x - approach[0]), Math.abs(loc.z - approach[1])) > 5) return false;
         return !isObstacleSuppressed(player, loc) && (LocType.get(loc.type).op ?? []).some(op => op?.toLowerCase() === keyword);
     });
     if (!loc) return false;
@@ -3250,7 +3269,7 @@ const TOLL_GATE_TYPE_IDS = new Set([2882, 2883, 1298, 1299, 1300, 1173, 375]);
 /** Queue one legitimate click and observe the barrier before resuming travel. */
 export function openNearbyGate(player: Player, radius = 30): boolean {
     if (pollObstacle(player)) return true;
-    const gate = _findLoc(player.x, player.z, player.level, radius,
+    const gate = findReachableLoc(player, radius,
         loc => gateOp(loc) !== null && !isObstacleSuppressed(player, loc));
     return gate ? _interactObstacle(player, gate, gateOp(gate)!) : false;
 }
@@ -3270,10 +3289,11 @@ export function openGateToward(player: Player, destX: number, destZ: number, rad
     const dz = destZ - player.z;
     const dist = Math.hypot(dx, dz);
     if (dist < 1) return false;
-    const gate = _findLoc(player.x, player.z, player.level, Math.min(radius, dist + 2), loc => {
+    const gate = findReachableLoc(player, Math.min(radius, dist + 2), loc => {
         if (alongApproach) {
-            const gx = loc.x - player.x;
-            const gz = loc.z - player.z;
+            // A wide gate's origin can be several tiles beside the crossing.
+            const gx = Math.max(loc.x, Math.min(player.x, loc.x + loc.width - 1)) - player.x;
+            const gz = Math.max(loc.z, Math.min(player.z, loc.z + loc.length - 1)) - player.z;
             const projection = (gx * dx + gz * dz) / dist;
             if (projection < 0 || projection > dist + 1 || Math.abs(gx * dz - gz * dx) / dist > 2) return false;
         }

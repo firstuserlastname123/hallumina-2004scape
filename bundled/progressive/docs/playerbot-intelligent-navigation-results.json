@@ -1,0 +1,4935 @@
+{
+  "baseCommit": "f9424aeeec2004a7d779f1a65ca5461136a73d9b",
+  "experiment": {
+    "seeds": [
+      254,
+      255
+    ],
+    "ticksPerRun": 6000,
+    "botsPerRun": 100,
+    "xpRate": 1,
+    "revision": 254,
+    "intervalMs": 0,
+    "runsSequential": true,
+    "freshDisposableSqliteAndSaves": true,
+    "observerSha256": "43cd8d9414232669f2811746f3c83dbc2283d5d4fccd5832b27372b855525a20"
+  },
+  "regressions": {
+    "passed": 42,
+    "failed": 0,
+    "preexistingTypeScriptErrors": 11,
+    "originalWorkspaceDataUnchanged": true
+  },
+  "productionSourceManifests": {
+    "dev-verified": {
+      "bundled/progressive/engine/src/engine/bot/BotAction.ts": "df69c297899cc8e6110c51ae8adc595567faf222965182aded74d45f35be8a88",
+      "bundled/progressive/engine/src/engine/bot/BotNavigation.ts": "2931fe8bb0ce55d1d0d7c2d774dcde82aa5aeb999ae9f2301222cc6ac087e96a",
+      "bundled/progressive/engine/src/engine/bot/BotObstacles.ts": "e5e751de9a9bb9e8b9a09f29d64523316d4aaeba0b7e6b13f80b5911ae40dbd2",
+      "bundled/progressive/engine/src/engine/bot/BotRouteRetry.ts": "9c8ea4cc562ffcb4ac9081ff0d12ab85e7b180d2da6d48c65a41359685280c89",
+      "bundled/progressive/engine/src/engine/bot/tasks/BotTaskBase.ts": "4fb407633dfece70a4d4f7416ac0e138a8bd58e9e8f77d613b6d4d04b935deb9",
+      "bundled/progressive/engine/src/engine/bot/tasks/CombatTask.ts": "5f54f5e0b102ea43f42f08d5310b72bc818d01c1a3e167498a9084738a5b4bc8",
+      "bundled/progressive/engine/src/engine/bot/tasks/FishingTask.ts": "73594b59ce897dc86884bb27e5d0c01dbbda8b77df6b580c1b3e967575ae49d1",
+      "bundled/progressive/engine/src/engine/bot/tasks/MiningTask.ts": "8ddd3225276fe9b41a29e712654e3bb33a2954e190524344e9b5402e3dcea02c",
+      "bundled/progressive/engine/src/engine/bot/tasks/PickupSpawnTask.ts": "99fef2e2a5a277552d8236ffd2c78bac38007edb108b55b587e096ffd7eb557c",
+      "bundled/progressive/engine/src/engine/bot/tasks/ShopTripTask.ts": "9c24c8114700d7dd423a109834f0fb856a6bd1ac3b8b5bd53339b57e8978d0d6",
+      "bundled/progressive/engine/src/engine/bot/tasks/WoodcuttingTask.ts": "0f9d510d358df84fe2da69ee48360c59f4c39312c8cdf30f8fa989e3122469fc",
+      "bundled/progressive/engine/src/engine/bot/BotLocalRoute.ts": null
+    },
+    "nav-release": {
+      "bundled/progressive/engine/src/engine/bot/BotAction.ts": "5061a041b089cd6753767c3d0fdffe867e5ccd0d8066149f874fb45d5285910b",
+      "bundled/progressive/engine/src/engine/bot/BotNavigation.ts": "daf2906e2ed1fc06a4492db7e292133bc5528539e571fecd708a69c59efa4319",
+      "bundled/progressive/engine/src/engine/bot/BotObstacles.ts": "09c44ed87076b9e6f0e346835968e7ed1fe9d072fdb8924d04e0d1a8809c9d0a",
+      "bundled/progressive/engine/src/engine/bot/BotRouteRetry.ts": "b917cf3c2eb0cece73af1a3ba5d1c0022c3c3982ae504bf589793d5ca2cf6d78",
+      "bundled/progressive/engine/src/engine/bot/tasks/BotTaskBase.ts": "2c36ac245c1c39c7f0387def6d5d3e0822d5f67a76a548815f69e11fe5d955c3",
+      "bundled/progressive/engine/src/engine/bot/tasks/CombatTask.ts": "38ee5800b4aadbbc221b1e0dbcc2265df816931a169a581f0309d1fc02a8c6cc",
+      "bundled/progressive/engine/src/engine/bot/tasks/FishingTask.ts": "ebf675f7005ee4c22ebab31999d398990cd0f3f5a1877096de4ca0bcb0c415e2",
+      "bundled/progressive/engine/src/engine/bot/tasks/MiningTask.ts": "8f7dc9ebe68cadbfed7dcad4f9e4744d798e9ffbbe4a6b6c33dc1ff748036436",
+      "bundled/progressive/engine/src/engine/bot/tasks/PickupSpawnTask.ts": "875ecb6b173203e33f674cbdbff682ceaad22dbb18c8a2e559ee186cdabfe830",
+      "bundled/progressive/engine/src/engine/bot/tasks/ShopTripTask.ts": "58e69297a1f2d7b1b736038f6173f97710398e32fb427712b8ecf40e0c962d93",
+      "bundled/progressive/engine/src/engine/bot/tasks/WoodcuttingTask.ts": "2c4cd688f34f2c74a9e3a6cef13023430275f6f946b49834b7ac3a0420445855",
+      "bundled/progressive/engine/src/engine/bot/BotLocalRoute.ts": "1b4dd5368c782e762ea485b863320b85ebc7a4620feb077e4e010f6d81d915bc"
+    }
+  },
+  "commonNativeFingerprints": {
+    "src/engine/bot/bots.config.json": "aefa37800b76511a1b677f3c2bee2c3cca3e9f9ed265d82790e956174752adda",
+    "data/pack/server/script.dat": "0c0c6b4691f762f4d64714855d52e740c7d05e374fb2544f2bbaad498410179f",
+    "data/pack/server/script.idx": "73859c7d064aa298529291a1778c89d3faacc50d9ae8e8b5d4a6a6f07f3c1d6d",
+    "data/bot/unwalkable_tiles.csv": "3f5e9db4bb89cb6301f2395c23f457e0a7ce3ce9f171ecefbad513d298e6c0db"
+  },
+  "runs": [
+    {
+      "melee": {
+        "damagingEngagements": 711,
+        "kills": 583,
+        "nativeXp": 10456,
+        "taskXp": 0,
+        "emptySearches": 668,
+        "travelProgress": 16363,
+        "deferrals": 161,
+        "unreachable": 218,
+        "noAttack": 0
+      },
+      "seed": 254,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 114.470631251,
+      "version": "dev-verified",
+      "sourceSha256": "43cd8d9414232669f2811746f3c83dbc2283d5d4fccd5832b27372b855525a20",
+      "featureSupport": {
+        "navigationRetry": true,
+        "taskDeferral": true
+      },
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 20,
+        "stationaryOscillation": 0,
+        "stuck": 355,
+        "timeoutMessages": 40,
+        "timeoutDiagnostics": 0,
+        "missingSheepMessages": 17,
+        "logLines": 914,
+        "logBytes": 132995,
+        "errors": 0,
+        "blockedStepsQueued": 66,
+        "noOpPathsQueued": 96,
+        "routesQueued": 22207,
+        "activeRoutesCleared": 8693,
+        "pathFailures": 106,
+        "noProgress": 16,
+        "taskDeferrals": 534,
+        "subtaskDeferrals": 0,
+        "subtasksScheduled": 0
+      },
+      "navigationFailures": {
+        "Combat:navigation_stuck": 169,
+        "PKer:path_failed": 11,
+        "Combat:path_failed": 29,
+        "Combat:no_progress": 14,
+        "Vendor:path_failed": 16,
+        "PKer:navigation_stuck": 10,
+        "Combat:navigation_oscillation": 8,
+        "Thieve:navigation_stuck": 88,
+        "Crafting:navigation_stuck": 67,
+        "Mine:navigation_oscillation": 9,
+        "Combat:obstacle_failed": 15,
+        "ShopTrip:navigation_stuck": 8,
+        "Thieve:obstacle_failed": 8,
+        "Thieve:no_progress": 1,
+        "Mine:obstacle_failed": 6,
+        "ShopTrip:path_failed": 28,
+        "Bankstand:path_failed": 6,
+        "Thieve:navigation_oscillation": 1,
+        "PKer:no_progress": 1,
+        "Agility:navigation_stuck": 1,
+        "Thieve:path_failed": 16,
+        "EdgevillePKer:navigation_stuck": 1,
+        "Smith:navigation_stuck": 2,
+        "Woodcut:1511:navigation_stuck": 8,
+        "PickupSpawn:navigation_oscillation": 2,
+        "PickupSpawn:navigation_stuck": 1,
+        "Smith:obstacle_failed": 1,
+        "ShopTrip:obstacle_failed": 1
+      },
+      "services": {
+        "bankOpened": 849,
+        "shopOpened": 41
+      },
+      "obstacles": {
+        "gateClicks": 187,
+        "gateScripts": 156,
+        "gateOpened": 144,
+        "gateUnverified": 12,
+        "transitionClicks": 84,
+        "transitionScripts": 84,
+        "transitionCompleted": 78,
+        "transitionUnverified": 6
+      },
+      "participation": {
+        "idleBotTicks": 21679,
+        "travelBotTicks": 244888,
+        "supportBotTicks": 160,
+        "activityBotTicks": 333273,
+        "progressionActivityBotTicks": 151343,
+        "agilityTaskBotTicks": 5121,
+        "nativeXpBotTicks": 9842,
+        "requestedTileArrivals": 3540,
+        "faresPaid": 480
+      },
+      "transportLegs": {
+        "sarim-karamja": {
+          "started": 8,
+          "arrived": 7,
+          "coins": 210
+        },
+        "brimhaven-ardougne": {
+          "started": 3,
+          "arrived": 3,
+          "coins": 90
+        },
+        "ardougne-brimhaven": {
+          "started": 1,
+          "arrived": 1,
+          "coins": 30
+        },
+        "karamja-sarim": {
+          "started": 5,
+          "arrived": 5,
+          "coins": 150
+        }
+      },
+      "nativeScriptXpGained": 80765.49999999994,
+      "taskCompletions": {
+        "Idle": 680,
+        "ShopTrip": 182,
+        "Bank": 3
+      },
+      "productionFingerprints": {
+        "tasks/CombatTask.ts": "5f54f5e0b102ea43f42f08d5310b72bc818d01c1a3e167498a9084738a5b4bc8",
+        "BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+        "BotAction.ts": "df69c297899cc8e6110c51ae8adc595567faf222965182aded74d45f35be8a88",
+        "BotNavigation.ts": "2931fe8bb0ce55d1d0d7c2d774dcde82aa5aeb999ae9f2301222cc6ac087e96a",
+        "BotLocalRoute.ts": null,
+        "BotObstacles.ts": "e5e751de9a9bb9e8b9a09f29d64523316d4aaeba0b7e6b13f80b5911ae40dbd2",
+        "BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+        "BotRouteRetry.ts": "9c8ea4cc562ffcb4ac9081ff0d12ab85e7b180d2da6d48c65a41359685280c89",
+        "BotDialogue.ts": "270b13847e747ac6c44b7d504fbf1851fd436d943b6998b3f66553048655a7df",
+        "BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+        "tasks/BotTaskBase.ts": "4fb407633dfece70a4d4f7416ac0e138a8bd58e9e8f77d613b6d4d04b935deb9",
+        "tasks/WoodcuttingTask.ts": "0f9d510d358df84fe2da69ee48360c59f4c39312c8cdf30f8fa989e3122469fc",
+        "tasks/MiningTask.ts": "8ddd3225276fe9b41a29e712654e3bb33a2954e190524344e9b5402e3dcea02c",
+        "tasks/FishingTask.ts": "73594b59ce897dc86884bb27e5d0c01dbbda8b77df6b580c1b3e967575ae49d1",
+        "tasks/ShopTripTask.ts": "9c24c8114700d7dd423a109834f0fb856a6bd1ac3b8b5bd53339b57e8978d0d6",
+        "tasks/SocialTask.ts": "972f9a211019f019fbbce29bbe2a5e5fd6b76123e400d0686a189ebade6d3127",
+        "tasks/AgilityTask.ts": "36958e71612a6ae7903874bde7e4e111764dbf3977ffb838a9ff37da8b8f8dc5"
+      },
+      "eventCounts": {
+        "detail": 78929,
+        "startup": 1,
+        "tutorial_completed": 100,
+        "travel_plan": 11238,
+        "task_deferred": 534,
+        "navigation_stuck": 355,
+        "target_unreachable": 218,
+        "combat_scan_empty": 668,
+        "gate_attempt": 187,
+        "gate_opened": 154,
+        "bury_bones": 139,
+        "summary": 60,
+        "bury_done": 138,
+        "heal_trigger": 28,
+        "ate_food": 56,
+        "flee_low_hp": 108,
+        "path_failed": 106,
+        "no_progress": 16,
+        "inv_full": 9,
+        "flee_trigger": 8,
+        "watchdog": 10,
+        "navigation_oscillation": 20,
+        "transport_started": 17,
+        "transport_fare": 16,
+        "transport_arrived": 16,
+        "obstacle_failed": 31,
+        "resource_missing": 47,
+        "shear_timeout": 13,
+        "agility_unreachable": 17
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 17.963749244333336,
+        "p95Ms": 23.783297000001767,
+        "p99Ms": 32.67281599999842,
+        "maxMs": 2971.1197890000003,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 2.6100895504999375,
+        "p95Ms": 5.757253000003402,
+        "p99Ms": 8.909663000000364,
+        "maxMs": 123.92167299999892,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 17.402502353846156,
+        "p95Ms": 23.750168999999005,
+        "p99Ms": 31.82828800000425,
+        "maxMs": 240.88815100000647,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 2.566805010869503,
+        "p95Ms": 5.737162999997963,
+        "p99Ms": 8.755879999996978,
+        "maxMs": 47.417607000001226,
+        "over600ms": 0
+      },
+      "xpGained": 81821.49999999994,
+      "levelsGained": 330,
+      "botsWithXp": 69,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 17631.300000000003,
+          "counters": {
+            "oscillation": 4,
+            "stationaryOscillation": 0,
+            "stuck": 26,
+            "timeoutMessages": 0,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 0,
+            "logLines": 147,
+            "logBytes": 19278,
+            "errors": 0,
+            "blockedStepsQueued": 10,
+            "noOpPathsQueued": 18,
+            "routesQueued": 3622,
+            "activeRoutesCleared": 1438,
+            "pathFailures": 12,
+            "noProgress": 3,
+            "taskDeferrals": 131,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 36917.5,
+          "counters": {
+            "oscillation": 6,
+            "stationaryOscillation": 0,
+            "stuck": 68,
+            "timeoutMessages": 0,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 5,
+            "logLines": 265,
+            "logBytes": 37543,
+            "errors": 0,
+            "blockedStepsQueued": 34,
+            "noOpPathsQueued": 19,
+            "routesQueued": 7456,
+            "activeRoutesCleared": 2980,
+            "pathFailures": 23,
+            "noProgress": 5,
+            "taskDeferrals": 200,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 48421.99999999999,
+          "counters": {
+            "oscillation": 12,
+            "stationaryOscillation": 0,
+            "stuck": 125,
+            "timeoutMessages": 10,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 15,
+            "logLines": 412,
+            "logBytes": 59373,
+            "errors": 0,
+            "blockedStepsQueued": 39,
+            "noOpPathsQueued": 25,
+            "routesQueued": 11262,
+            "activeRoutesCleared": 4379,
+            "pathFailures": 28,
+            "noProgress": 7,
+            "taskDeferrals": 263,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 59763.399999999994,
+          "counters": {
+            "oscillation": 13,
+            "stationaryOscillation": 0,
+            "stuck": 188,
+            "timeoutMessages": 20,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 15,
+            "logLines": 568,
+            "logBytes": 82614,
+            "errors": 0,
+            "blockedStepsQueued": 54,
+            "noOpPathsQueued": 41,
+            "routesQueued": 14803,
+            "activeRoutesCleared": 5778,
+            "pathFailures": 49,
+            "noProgress": 12,
+            "taskDeferrals": 357,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 71943.19999999995,
+          "counters": {
+            "oscillation": 18,
+            "stationaryOscillation": 0,
+            "stuck": 250,
+            "timeoutMessages": 30,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 15,
+            "logLines": 724,
+            "logBytes": 105828,
+            "errors": 0,
+            "blockedStepsQueued": 59,
+            "noOpPathsQueued": 55,
+            "routesQueued": 18564,
+            "activeRoutesCleared": 7253,
+            "pathFailures": 58,
+            "noProgress": 14,
+            "taskDeferrals": 438,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 81821.49999999994,
+          "counters": {
+            "oscillation": 20,
+            "stationaryOscillation": 0,
+            "stuck": 355,
+            "timeoutMessages": 40,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 17,
+            "logLines": 914,
+            "logBytes": 132995,
+            "errors": 0,
+            "blockedStepsQueued": 66,
+            "noOpPathsQueued": 96,
+            "routesQueued": 22207,
+            "activeRoutesCleared": 8693,
+            "pathFailures": 106,
+            "noProgress": 16,
+            "taskDeferrals": 534,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        }
+      ],
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "cohorts": {
+        "progression": {
+          "count": 52,
+          "nativeXp": 46918.599999999955,
+          "withNativeXp": 52
+        },
+        "specialists": {
+          "count": 48,
+          "nativeXp": 33846.9,
+          "withNativeXp": 10
+        }
+      },
+      "sampledFailureLocations": [
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3213,3247,0",
+          "count": 16
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3205,
+            3273,
+            0
+          ],
+          "destination": "interaction target",
+          "count": 11
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3211,
+            3273,
+            0
+          ],
+          "destination": "3269,3163,0",
+          "count": 9
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3209,
+            3213,
+            1
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3204,
+            3272,
+            0
+          ],
+          "destination": "interaction target",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3223,3238,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3226,
+            3238,
+            0
+          ],
+          "destination": "3228,3239,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3226,
+            3242,
+            0
+          ],
+          "destination": "3224,3244,0",
+          "count": 7
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3226,
+            3238,
+            0
+          ],
+          "destination": "3226,3241,0",
+          "count": 7
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3225,
+            3241,
+            0
+          ],
+          "destination": "3221,3237,0",
+          "count": 7
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3195,
+            3439,
+            0
+          ],
+          "destination": "3195,3440,0",
+          "count": 6
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3179,
+            3438,
+            0
+          ],
+          "destination": "3180,3438,0",
+          "count": 6
+        },
+        {
+          "task": "ShopTrip",
+          "event": "navigation_stuck",
+          "at": [
+            3112,
+            3348,
+            0
+          ],
+          "destination": "3213,3247,0",
+          "count": 6
+        },
+        {
+          "task": "Woodcut:1511",
+          "event": "navigation_stuck",
+          "at": [
+            3279,
+            3183,
+            0
+          ],
+          "destination": "3269,3163,0",
+          "count": 6
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3204,
+            3188,
+            0
+          ],
+          "destination": "3205,3188,0",
+          "count": 5
+        },
+        {
+          "task": "PKer",
+          "event": "path_failed",
+          "at": [
+            3050,
+            3705,
+            0
+          ],
+          "destination": "3052,3701,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3254,
+            3225,
+            0
+          ],
+          "destination": "3256,3230,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_oscillation",
+          "at": [
+            3226,
+            3238,
+            0
+          ],
+          "destination": "3231,3296,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3112,
+            3348,
+            0
+          ],
+          "destination": "3055,3491,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "obstacle_failed",
+          "at": [
+            3112,
+            3348,
+            0
+          ],
+          "destination": "3055,3491,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3209,
+            3213,
+            1
+          ],
+          "destination": "3058,3494,0",
+          "count": 4
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3205,
+            3273,
+            0
+          ],
+          "destination": "3269,3163,0",
+          "count": 4
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3212,
+            3263,
+            0
+          ],
+          "destination": "interaction target",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3049,
+            3482,
+            0
+          ],
+          "destination": "3052,3491,0",
+          "count": 4
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3212,
+            3260,
+            0
+          ],
+          "destination": "interaction target",
+          "count": 4
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3204,
+            3258,
+            0
+          ],
+          "destination": "interaction target",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3234,
+            3302,
+            0
+          ],
+          "destination": "3241,3296,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3049,
+            3482,
+            0
+          ],
+          "destination": "3051,3491,0",
+          "count": 4
+        },
+        {
+          "task": "PKer",
+          "event": "path_failed",
+          "at": [
+            3051,
+            3706,
+            0
+          ],
+          "destination": "3055,3702,0",
+          "count": 4
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3212,
+            3261,
+            0
+          ],
+          "destination": "3269,3163,0",
+          "count": 4
+        }
+      ],
+      "botNativeXp": [
+        {
+          "name": "sk1",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1579.5
+        },
+        {
+          "name": "sk2",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 227.5
+        },
+        {
+          "name": "sk3",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 951.8999999999987
+        },
+        {
+          "name": "sk4",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 685.5
+        },
+        {
+          "name": "sk5",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 367.5
+        },
+        {
+          "name": "sk6",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1322.499999999999
+        },
+        {
+          "name": "sk7",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1231.8000000000002
+        },
+        {
+          "name": "sk8",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1291.599999999999
+        },
+        {
+          "name": "sk9",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 785
+        },
+        {
+          "name": "sk10",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1234.9999999999986
+        },
+        {
+          "name": "sk11",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 575.5
+        },
+        {
+          "name": "sk12",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1663
+        },
+        {
+          "name": "sk13",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 507.60000000000014
+        },
+        {
+          "name": "fi1",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1220.8999999999971
+        },
+        {
+          "name": "fi2",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 951.8999999999976
+        },
+        {
+          "name": "fi3",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1072.299999999998
+        },
+        {
+          "name": "fi4",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1005.2999999999968
+        },
+        {
+          "name": "fi5",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 873.7999999999975
+        },
+        {
+          "name": "fi6",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 715.899999999999
+        },
+        {
+          "name": "fi7",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 976.6999999999998
+        },
+        {
+          "name": "fi8",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1274.299999999995
+        },
+        {
+          "name": "fi9",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 889.9999999999987
+        },
+        {
+          "name": "fi10",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 793.5999999999993
+        },
+        {
+          "name": "fi11",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1061.0999999999979
+        },
+        {
+          "name": "fi12",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 775.4999999999991
+        },
+        {
+          "name": "fi13",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 926.3999999999977
+        },
+        {
+          "name": "ba1",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 776.6999999999982
+        },
+        {
+          "name": "ba2",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 633.5
+        },
+        {
+          "name": "ba3",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 855.1999999999994
+        },
+        {
+          "name": "ba4",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1129.8999999999983
+        },
+        {
+          "name": "ba5",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 685.0000000000002
+        },
+        {
+          "name": "ba6",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 80
+        },
+        {
+          "name": "ba7",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1087.8999999999994
+        },
+        {
+          "name": "ba8",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 914.1000000000004
+        },
+        {
+          "name": "ba9",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 881.5999999999999
+        },
+        {
+          "name": "ba10",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 794.099999999999
+        },
+        {
+          "name": "ba11",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1101.6999999999964
+        },
+        {
+          "name": "ba12",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 827.6999999999995
+        },
+        {
+          "name": "ba13",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 656.7999999999993
+        },
+        {
+          "name": "ra1",
+          "personality": "Random",
+          "nativeScriptXpGained": 973.5000000000002
+        },
+        {
+          "name": "ra2",
+          "personality": "Random",
+          "nativeScriptXpGained": 1058.1000000000004
+        },
+        {
+          "name": "ra3",
+          "personality": "Random",
+          "nativeScriptXpGained": 330.0000000000001
+        },
+        {
+          "name": "ra4",
+          "personality": "Random",
+          "nativeScriptXpGained": 1120.8999999999992
+        },
+        {
+          "name": "ra5",
+          "personality": "Random",
+          "nativeScriptXpGained": 532.8
+        },
+        {
+          "name": "ra6",
+          "personality": "Random",
+          "nativeScriptXpGained": 504.8000000000003
+        },
+        {
+          "name": "ra7",
+          "personality": "Random",
+          "nativeScriptXpGained": 1320.6999999999975
+        },
+        {
+          "name": "ra8",
+          "personality": "Random",
+          "nativeScriptXpGained": 1205.3999999999962
+        },
+        {
+          "name": "ra9",
+          "personality": "Random",
+          "nativeScriptXpGained": 648.1000000000004
+        },
+        {
+          "name": "ra10",
+          "personality": "Random",
+          "nativeScriptXpGained": 614.6999999999999
+        },
+        {
+          "name": "ra11",
+          "personality": "Random",
+          "nativeScriptXpGained": 639.5999999999997
+        },
+        {
+          "name": "ra12",
+          "personality": "Random",
+          "nativeScriptXpGained": 1150.9999999999993
+        },
+        {
+          "name": "ra13",
+          "personality": "Random",
+          "nativeScriptXpGained": 1433.1999999999994
+        },
+        {
+          "name": "war1",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war2",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5910.299999999998
+        },
+        {
+          "name": "war3",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war4",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3315
+        },
+        {
+          "name": "war5",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1204
+        },
+        {
+          "name": "war6",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1608.1999999999994
+        },
+        {
+          "name": "war7",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 7887.5999999999985
+        },
+        {
+          "name": "war8",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 4537.599999999998
+        },
+        {
+          "name": "war9",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war10",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5363.300000000003
+        },
+        {
+          "name": "war11",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2553.6000000000004
+        },
+        {
+          "name": "war12",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1462
+        },
+        {
+          "name": "ven1",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven2",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven3",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven4",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven5",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven6",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven7",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 5.3
+        },
+        {
+          "name": "ven8",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven9",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven10",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven11",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven12",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk1",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk2",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk3",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk4",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk5",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk6",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk7",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk8",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk9",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk10",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk11",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk12",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc1",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc2",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc3",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc4",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc5",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc6",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc7",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc8",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc9",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc10",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc11",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc12",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        }
+      ],
+      "rawReportSha256": "4ad157d47020fe60f96857c788beb52ebeba272f3cc4903c5a49cc95a8057da0"
+    },
+    {
+      "melee": {
+        "damagingEngagements": 935,
+        "kills": 813,
+        "nativeXp": 13736,
+        "taskXp": 0,
+        "emptySearches": 992,
+        "travelProgress": 10850,
+        "deferrals": 174,
+        "unreachable": 37,
+        "noAttack": 1
+      },
+      "seed": 254,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 121.375432802,
+      "version": "nav-release",
+      "sourceSha256": "43cd8d9414232669f2811746f3c83dbc2283d5d4fccd5832b27372b855525a20",
+      "featureSupport": {
+        "navigationRetry": true,
+        "taskDeferral": true
+      },
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 0,
+        "stationaryOscillation": 0,
+        "stuck": 204,
+        "timeoutMessages": 59,
+        "timeoutDiagnostics": 45,
+        "missingSheepMessages": 14,
+        "logLines": 815,
+        "logBytes": 122863,
+        "errors": 0,
+        "blockedStepsQueued": 46,
+        "noOpPathsQueued": 55,
+        "routesQueued": 19029,
+        "activeRoutesCleared": 8344,
+        "pathFailures": 442,
+        "noProgress": 16,
+        "taskDeferrals": 670,
+        "subtaskDeferrals": 0,
+        "subtasksScheduled": 0
+      },
+      "navigationFailures": {
+        "Combat:navigation_stuck": 40,
+        "Combat:path_failed": 113,
+        "Vendor:path_failed": 23,
+        "PKer:navigation_stuck": 6,
+        "Social:path_failed": 3,
+        "Mine:path_failed": 36,
+        "ShopTrip:navigation_stuck": 7,
+        "Firemaking:navigation_stuck": 60,
+        "Thieve:path_failed": 83,
+        "PickupSpawn:path_failed": 8,
+        "Mine:navigation_stuck": 2,
+        "Combat:no_progress": 12,
+        "EdgevillePKer:navigation_stuck": 10,
+        "Thieve:navigation_stuck": 63,
+        "Thieve:no_progress": 2,
+        "EdgevillePKer:path_failed": 1,
+        "Crafting:path_failed": 35,
+        "ShopTrip:no_progress": 2,
+        "Crafting:navigation_stuck": 13,
+        "Social:navigation_stuck": 2,
+        "PKer:path_failed": 16,
+        "Bank:path_failed": 44,
+        "ShopTrip:path_failed": 79,
+        "Agility:path_failed": 1,
+        "Smith:navigation_stuck": 1
+      },
+      "services": {
+        "bankOpened": 982,
+        "shopOpened": 156
+      },
+      "obstacles": {
+        "gateClicks": 87,
+        "gateScripts": 84,
+        "gateOpened": 80,
+        "gateUnverified": 4,
+        "transitionClicks": 0,
+        "transitionScripts": 0,
+        "transitionCompleted": 0,
+        "transitionUnverified": 0
+      },
+      "participation": {
+        "idleBotTicks": 27148,
+        "travelBotTicks": 261513,
+        "supportBotTicks": 553,
+        "activityBotTicks": 310786,
+        "progressionActivityBotTicks": 129067,
+        "agilityTaskBotTicks": 4586,
+        "nativeXpBotTicks": 10784,
+        "requestedTileArrivals": 4210,
+        "faresPaid": 0
+      },
+      "transportLegs": {},
+      "nativeScriptXpGained": 72674.49999999994,
+      "taskCompletions": {
+        "Idle": 865,
+        "ShopTrip": 129,
+        "Bank": 10
+      },
+      "productionFingerprints": {
+        "tasks/CombatTask.ts": "38ee5800b4aadbbc221b1e0dbcc2265df816931a169a581f0309d1fc02a8c6cc",
+        "BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+        "BotAction.ts": "5061a041b089cd6753767c3d0fdffe867e5ccd0d8066149f874fb45d5285910b",
+        "BotNavigation.ts": "daf2906e2ed1fc06a4492db7e292133bc5528539e571fecd708a69c59efa4319",
+        "BotLocalRoute.ts": "1b4dd5368c782e762ea485b863320b85ebc7a4620feb077e4e010f6d81d915bc",
+        "BotObstacles.ts": "09c44ed87076b9e6f0e346835968e7ed1fe9d072fdb8924d04e0d1a8809c9d0a",
+        "BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+        "BotRouteRetry.ts": "b917cf3c2eb0cece73af1a3ba5d1c0022c3c3982ae504bf589793d5ca2cf6d78",
+        "BotDialogue.ts": "270b13847e747ac6c44b7d504fbf1851fd436d943b6998b3f66553048655a7df",
+        "BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+        "tasks/BotTaskBase.ts": "2c36ac245c1c39c7f0387def6d5d3e0822d5f67a76a548815f69e11fe5d955c3",
+        "tasks/WoodcuttingTask.ts": "2c4cd688f34f2c74a9e3a6cef13023430275f6f946b49834b7ac3a0420445855",
+        "tasks/MiningTask.ts": "8f7dc9ebe68cadbfed7dcad4f9e4744d798e9ffbbe4a6b6c33dc1ff748036436",
+        "tasks/FishingTask.ts": "ebf675f7005ee4c22ebab31999d398990cd0f3f5a1877096de4ca0bcb0c415e2",
+        "tasks/ShopTripTask.ts": "58e69297a1f2d7b1b736038f6173f97710398e32fb427712b8ecf40e0c962d93",
+        "tasks/SocialTask.ts": "972f9a211019f019fbbce29bbe2a5e5fd6b76123e400d0686a189ebade6d3127",
+        "tasks/AgilityTask.ts": "36958e71612a6ae7903874bde7e4e111764dbf3977ffb838a9ff37da8b8f8dc5"
+      },
+      "eventCounts": {
+        "detail": 43018,
+        "startup": 1,
+        "tutorial_completed": 100,
+        "travel_plan": 10613,
+        "task_deferred": 670,
+        "navigation_stuck": 204,
+        "combat_scan_empty": 992,
+        "gate_attempt": 87,
+        "gate_opened": 84,
+        "summary": 60,
+        "bury_bones": 178,
+        "bury_done": 175,
+        "heal_trigger": 30,
+        "ate_food": 60,
+        "flee_low_hp": 111,
+        "timeouts": 45,
+        "target_unreachable": 37,
+        "path_failed": 442,
+        "inv_full": 13,
+        "flee_trigger": 6,
+        "watchdog": 12,
+        "agility_unreachable": 45,
+        "no_progress": 16,
+        "resource_missing": 31,
+        "shear_timeout": 2,
+        "no_attack_timeout": 1
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 19.101512265833353,
+        "p95Ms": 33.296710000009625,
+        "p99Ms": 50.326343000000634,
+        "maxMs": 2861.532247000001,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 5.127511610666645,
+        "p95Ms": 17.718958000001294,
+        "p99Ms": 29.95195899999817,
+        "maxMs": 216.35920000000078,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 18.541002485785974,
+        "p95Ms": 33.1268940000009,
+        "p99Ms": 49.96063900000445,
+        "maxMs": 211.3706630000088,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 5.049586244983256,
+        "p95Ms": 17.651836999997613,
+        "p99Ms": 29.66277500000433,
+        "maxMs": 112.97721500000262,
+        "over600ms": 0
+      },
+      "xpGained": 73857.49999999996,
+      "levelsGained": 363,
+      "botsWithXp": 68,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 16134.800000000001,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 57,
+            "timeoutMessages": 9,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 0,
+            "logLines": 145,
+            "logBytes": 19777,
+            "errors": 0,
+            "blockedStepsQueued": 3,
+            "noOpPathsQueued": 6,
+            "routesQueued": 3162,
+            "activeRoutesCleared": 1324,
+            "pathFailures": 23,
+            "noProgress": 4,
+            "taskDeferrals": 126,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 28794.599999999995,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 113,
+            "timeoutMessages": 19,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 4,
+            "logLines": 292,
+            "logBytes": 41689,
+            "errors": 0,
+            "blockedStepsQueued": 15,
+            "noOpPathsQueued": 13,
+            "routesQueued": 6540,
+            "activeRoutesCleared": 2863,
+            "pathFailures": 91,
+            "noProgress": 7,
+            "taskDeferrals": 258,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 41442.69999999998,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 129,
+            "timeoutMessages": 29,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 4,
+            "logLines": 420,
+            "logBytes": 61602,
+            "errors": 0,
+            "blockedStepsQueued": 27,
+            "noOpPathsQueued": 30,
+            "routesQueued": 9665,
+            "activeRoutesCleared": 4145,
+            "pathFailures": 190,
+            "noProgress": 11,
+            "taskDeferrals": 357,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 53994.19999999997,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 154,
+            "timeoutMessages": 39,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 14,
+            "logLines": 554,
+            "logBytes": 81946,
+            "errors": 0,
+            "blockedStepsQueued": 31,
+            "noOpPathsQueued": 33,
+            "routesQueued": 12943,
+            "activeRoutesCleared": 5609,
+            "pathFailures": 269,
+            "noProgress": 15,
+            "taskDeferrals": 460,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 66351.99999999994,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 174,
+            "timeoutMessages": 49,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 14,
+            "logLines": 659,
+            "logBytes": 99870,
+            "errors": 0,
+            "blockedStepsQueued": 32,
+            "noOpPathsQueued": 33,
+            "routesQueued": 16086,
+            "activeRoutesCleared": 6985,
+            "pathFailures": 317,
+            "noProgress": 15,
+            "taskDeferrals": 546,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 73857.49999999996,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 204,
+            "timeoutMessages": 59,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 14,
+            "logLines": 815,
+            "logBytes": 122863,
+            "errors": 0,
+            "blockedStepsQueued": 46,
+            "noOpPathsQueued": 55,
+            "routesQueued": 19029,
+            "activeRoutesCleared": 8344,
+            "pathFailures": 442,
+            "noProgress": 16,
+            "taskDeferrals": 670,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        }
+      ],
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "cohorts": {
+        "progression": {
+          "count": 52,
+          "nativeXp": 49517.099999999926,
+          "withNativeXp": 52
+        },
+        "specialists": {
+          "count": 48,
+          "nativeXp": 23157.4,
+          "withNativeXp": 10
+        }
+      },
+      "sampledFailureLocations": [
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3223,3238,0",
+          "count": 24
+        },
+        {
+          "task": "Bank",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3092,3245,0",
+          "count": 20
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3213,3247,0",
+          "count": 20
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3092,3245,0",
+          "count": 17
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3209,
+            3213,
+            1
+          ],
+          "destination": "3213,3247,0",
+          "count": 12
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3176,
+            3206,
+            0
+          ],
+          "destination": "3205,3188,0",
+          "count": 10
+        },
+        {
+          "task": "Bank",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3253,3420,0",
+          "count": 10
+        },
+        {
+          "task": "Bank",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3013,3355,0",
+          "count": 10
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3253,3420,0",
+          "count": 9
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3013,3355,0",
+          "count": 9
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3227,
+            3242,
+            0
+          ],
+          "destination": "3227,3242,0",
+          "count": 9
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            2708,
+            3472,
+            1
+          ],
+          "destination": "3206,3189,0",
+          "count": 8
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            2970,
+            3215,
+            1
+          ],
+          "destination": "2976,3229,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3276,
+            3499,
+            1
+          ],
+          "destination": "3213,3247,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            2955,
+            3388,
+            2
+          ],
+          "destination": "3192,3279,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2955,
+            3388,
+            2
+          ],
+          "destination": "3223,3238,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3209,
+            3213,
+            1
+          ],
+          "destination": "3237,3296,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2964,
+            3213,
+            1
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3226,
+            3238,
+            0
+          ],
+          "destination": "3227,3238,0",
+          "count": 7
+        },
+        {
+          "task": "PKer",
+          "event": "path_failed",
+          "at": [
+            3087,
+            3661,
+            0
+          ],
+          "destination": "3091,3658,0",
+          "count": 7
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2955,
+            3388,
+            2
+          ],
+          "destination": "3231,3203,0",
+          "count": 7
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2708,
+            3472,
+            1
+          ],
+          "destination": "2725,3493,0",
+          "count": 6
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            2708,
+            3472,
+            1
+          ],
+          "destination": "2725,3493,0",
+          "count": 6
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3179,
+            3438,
+            0
+          ],
+          "destination": "3180,3438,0",
+          "count": 6
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2970,
+            3215,
+            1
+          ],
+          "destination": "3092,3245,0",
+          "count": 6
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3195,
+            3439,
+            0
+          ],
+          "destination": "3195,3440,0",
+          "count": 5
+        },
+        {
+          "task": "Crafting",
+          "event": "navigation_stuck",
+          "at": [
+            3205,
+            3273,
+            0
+          ],
+          "destination": "3092,3245,0",
+          "count": 5
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            2708,
+            3472,
+            1
+          ],
+          "destination": "3259,3237,0",
+          "count": 4
+        },
+        {
+          "task": "PickupSpawn",
+          "event": "path_failed",
+          "at": [
+            2708,
+            3472,
+            1
+          ],
+          "destination": "2702,3476,0",
+          "count": 4
+        }
+      ],
+      "botNativeXp": [
+        {
+          "name": "sk1",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1162.2
+        },
+        {
+          "name": "sk2",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1328.3999999999996
+        },
+        {
+          "name": "sk3",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 324.2000000000001
+        },
+        {
+          "name": "sk4",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1035.5
+        },
+        {
+          "name": "sk5",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 426.60000000000014
+        },
+        {
+          "name": "sk6",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1520.8999999999987
+        },
+        {
+          "name": "sk7",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 745.8999999999992
+        },
+        {
+          "name": "sk8",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 782.5999999999997
+        },
+        {
+          "name": "sk9",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1060.9999999999982
+        },
+        {
+          "name": "sk10",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1011.3999999999983
+        },
+        {
+          "name": "sk11",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 550.3
+        },
+        {
+          "name": "sk12",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 192
+        },
+        {
+          "name": "sk13",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1548.8999999999996
+        },
+        {
+          "name": "fi1",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 565.9999999999995
+        },
+        {
+          "name": "fi2",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 249.1000000000002
+        },
+        {
+          "name": "fi3",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 481.9000000000004
+        },
+        {
+          "name": "fi4",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 670.8999999999994
+        },
+        {
+          "name": "fi5",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1175.8999999999955
+        },
+        {
+          "name": "fi6",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 788.2999999999996
+        },
+        {
+          "name": "fi7",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1198.499999999997
+        },
+        {
+          "name": "fi8",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 735.7999999999986
+        },
+        {
+          "name": "fi9",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1152.3999999999987
+        },
+        {
+          "name": "fi10",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1435.4999999999955
+        },
+        {
+          "name": "fi11",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 192.50000000000003
+        },
+        {
+          "name": "fi12",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 867.0999999999985
+        },
+        {
+          "name": "fi13",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 600.3999999999999
+        },
+        {
+          "name": "ba1",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 726.2999999999989
+        },
+        {
+          "name": "ba2",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 829.0999999999983
+        },
+        {
+          "name": "ba3",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 990.4999999999984
+        },
+        {
+          "name": "ba4",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 958.6999999999991
+        },
+        {
+          "name": "ba5",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1159.0999999999976
+        },
+        {
+          "name": "ba6",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 2234.7000000000016
+        },
+        {
+          "name": "ba7",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 558.9000000000003
+        },
+        {
+          "name": "ba8",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 286.6000000000002
+        },
+        {
+          "name": "ba9",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 547.4
+        },
+        {
+          "name": "ba10",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 948.9999999999977
+        },
+        {
+          "name": "ba11",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1111.2999999999956
+        },
+        {
+          "name": "ba12",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1932.5999999999974
+        },
+        {
+          "name": "ba13",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1041.4999999999975
+        },
+        {
+          "name": "ra1",
+          "personality": "Random",
+          "nativeScriptXpGained": 1025.0999999999976
+        },
+        {
+          "name": "ra2",
+          "personality": "Random",
+          "nativeScriptXpGained": 1322.6999999999966
+        },
+        {
+          "name": "ra3",
+          "personality": "Random",
+          "nativeScriptXpGained": 1002.899999999999
+        },
+        {
+          "name": "ra4",
+          "personality": "Random",
+          "nativeScriptXpGained": 1720.4999999999936
+        },
+        {
+          "name": "ra5",
+          "personality": "Random",
+          "nativeScriptXpGained": 1134.1000000000001
+        },
+        {
+          "name": "ra6",
+          "personality": "Random",
+          "nativeScriptXpGained": 1335.6999999999946
+        },
+        {
+          "name": "ra7",
+          "personality": "Random",
+          "nativeScriptXpGained": 1362.7999999999945
+        },
+        {
+          "name": "ra8",
+          "personality": "Random",
+          "nativeScriptXpGained": 537.8000000000003
+        },
+        {
+          "name": "ra9",
+          "personality": "Random",
+          "nativeScriptXpGained": 2058.9999999999977
+        },
+        {
+          "name": "ra10",
+          "personality": "Random",
+          "nativeScriptXpGained": 667.4000000000003
+        },
+        {
+          "name": "ra11",
+          "personality": "Random",
+          "nativeScriptXpGained": 1201.199999999997
+        },
+        {
+          "name": "ra12",
+          "personality": "Random",
+          "nativeScriptXpGained": 138
+        },
+        {
+          "name": "ra13",
+          "personality": "Random",
+          "nativeScriptXpGained": 879.9999999999982
+        },
+        {
+          "name": "war1",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war2",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2761.8999999999987
+        },
+        {
+          "name": "war3",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war4",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3356.800000000001
+        },
+        {
+          "name": "war5",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1238.3000000000002
+        },
+        {
+          "name": "war6",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 718.8000000000002
+        },
+        {
+          "name": "war7",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2553.6000000000004
+        },
+        {
+          "name": "war8",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3152.2000000000003
+        },
+        {
+          "name": "war9",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 222.60000000000002
+        },
+        {
+          "name": "war10",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3820.300000000001
+        },
+        {
+          "name": "war11",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 4060
+        },
+        {
+          "name": "war12",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1272.9000000000003
+        },
+        {
+          "name": "ven1",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven2",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven3",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven4",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven5",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven6",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven7",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven8",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven9",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven10",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven11",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven12",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk1",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk2",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk3",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk4",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk5",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk6",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk7",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk8",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk9",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk10",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk11",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk12",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc1",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc2",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc3",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc4",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc5",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc6",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc7",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc8",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc9",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc10",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc11",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc12",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        }
+      ],
+      "rawReportSha256": "683bd7e99a314a255209b7905ff73753a45393a8a732a48db6b52cbccb02f5d0"
+    },
+    {
+      "melee": {
+        "damagingEngagements": 749,
+        "kills": 620,
+        "nativeXp": 10876,
+        "taskXp": 0,
+        "emptySearches": 641,
+        "travelProgress": 15141,
+        "deferrals": 166,
+        "unreachable": 253,
+        "noAttack": 2
+      },
+      "seed": 255,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 107.42265282299999,
+      "version": "dev-verified",
+      "sourceSha256": "43cd8d9414232669f2811746f3c83dbc2283d5d4fccd5832b27372b855525a20",
+      "featureSupport": {
+        "navigationRetry": true,
+        "taskDeferral": true
+      },
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 15,
+        "stationaryOscillation": 0,
+        "stuck": 427,
+        "timeoutMessages": 56,
+        "timeoutDiagnostics": 0,
+        "missingSheepMessages": 5,
+        "logLines": 1069,
+        "logBytes": 153267,
+        "errors": 0,
+        "blockedStepsQueued": 28,
+        "noOpPathsQueued": 92,
+        "routesQueued": 21765,
+        "activeRoutesCleared": 9017,
+        "pathFailures": 423,
+        "noProgress": 14,
+        "taskDeferrals": 578,
+        "subtaskDeferrals": 0,
+        "subtasksScheduled": 0
+      },
+      "navigationFailures": {
+        "Combat:navigation_oscillation": 8,
+        "Combat:navigation_stuck": 201,
+        "Combat:path_failed": 111,
+        "Combat:no_progress": 10,
+        "EdgevillePKer:navigation_stuck": 2,
+        "Mine:navigation_stuck": 3,
+        "Mine:path_failed": 58,
+        "Thieve:path_failed": 91,
+        "ShopTrip:path_failed": 84,
+        "Mine:obstacle_failed": 2,
+        "Mine:navigation_oscillation": 2,
+        "Thieve:navigation_stuck": 99,
+        "Vendor:path_failed": 25,
+        "PickupSpawn:path_failed": 12,
+        "PKer:navigation_stuck": 4,
+        "PKer:path_failed": 8,
+        "Combat:obstacle_failed": 11,
+        "Crafting:navigation_stuck": 34,
+        "Smith:navigation_stuck": 63,
+        "Thieve:obstacle_failed": 15,
+        "Smith:no_progress": 3,
+        "Woodcut:1511:navigation_stuck": 15,
+        "Thieve:navigation_oscillation": 2,
+        "Thieve:no_progress": 1,
+        "PickupSpawn:navigation_oscillation": 3,
+        "Bankstand:path_failed": 8,
+        "Bankstand:navigation_stuck": 1,
+        "Social:path_failed": 24,
+        "Social:navigation_stuck": 1,
+        "ShopTrip:navigation_stuck": 4,
+        "Smith:path_failed": 2
+      },
+      "services": {
+        "bankOpened": 874,
+        "shopOpened": 49
+      },
+      "obstacles": {
+        "gateClicks": 189,
+        "gateScripts": 152,
+        "gateOpened": 139,
+        "gateUnverified": 13,
+        "transitionClicks": 26,
+        "transitionScripts": 26,
+        "transitionCompleted": 26,
+        "transitionUnverified": 0
+      },
+      "participation": {
+        "idleBotTicks": 23491,
+        "travelBotTicks": 255422,
+        "supportBotTicks": 164,
+        "activityBotTicks": 320923,
+        "progressionActivityBotTicks": 138041,
+        "agilityTaskBotTicks": 4821,
+        "nativeXpBotTicks": 9451,
+        "requestedTileArrivals": 3369,
+        "faresPaid": 360
+      },
+      "transportLegs": {
+        "sarim-karamja": {
+          "started": 3,
+          "arrived": 3,
+          "coins": 90
+        },
+        "brimhaven-ardougne": {
+          "started": 3,
+          "arrived": 3,
+          "coins": 90
+        },
+        "ardougne-brimhaven": {
+          "started": 3,
+          "arrived": 3,
+          "coins": 90
+        },
+        "karamja-sarim": {
+          "started": 3,
+          "arrived": 3,
+          "coins": 90
+        }
+      },
+      "nativeScriptXpGained": 73433.79999999996,
+      "taskCompletions": {
+        "Idle": 747,
+        "ShopTrip": 183,
+        "Bank": 2
+      },
+      "productionFingerprints": {
+        "tasks/CombatTask.ts": "5f54f5e0b102ea43f42f08d5310b72bc818d01c1a3e167498a9084738a5b4bc8",
+        "BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+        "BotAction.ts": "df69c297899cc8e6110c51ae8adc595567faf222965182aded74d45f35be8a88",
+        "BotNavigation.ts": "2931fe8bb0ce55d1d0d7c2d774dcde82aa5aeb999ae9f2301222cc6ac087e96a",
+        "BotLocalRoute.ts": null,
+        "BotObstacles.ts": "e5e751de9a9bb9e8b9a09f29d64523316d4aaeba0b7e6b13f80b5911ae40dbd2",
+        "BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+        "BotRouteRetry.ts": "9c8ea4cc562ffcb4ac9081ff0d12ab85e7b180d2da6d48c65a41359685280c89",
+        "BotDialogue.ts": "270b13847e747ac6c44b7d504fbf1851fd436d943b6998b3f66553048655a7df",
+        "BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+        "tasks/BotTaskBase.ts": "4fb407633dfece70a4d4f7416ac0e138a8bd58e9e8f77d613b6d4d04b935deb9",
+        "tasks/WoodcuttingTask.ts": "0f9d510d358df84fe2da69ee48360c59f4c39312c8cdf30f8fa989e3122469fc",
+        "tasks/MiningTask.ts": "8ddd3225276fe9b41a29e712654e3bb33a2954e190524344e9b5402e3dcea02c",
+        "tasks/FishingTask.ts": "73594b59ce897dc86884bb27e5d0c01dbbda8b77df6b580c1b3e967575ae49d1",
+        "tasks/ShopTripTask.ts": "9c24c8114700d7dd423a109834f0fb856a6bd1ac3b8b5bd53339b57e8978d0d6",
+        "tasks/SocialTask.ts": "972f9a211019f019fbbce29bbe2a5e5fd6b76123e400d0686a189ebade6d3127",
+        "tasks/AgilityTask.ts": "36958e71612a6ae7903874bde7e4e111764dbf3977ffb838a9ff37da8b8f8dc5"
+      },
+      "eventCounts": {
+        "detail": 89371,
+        "startup": 1,
+        "tutorial_completed": 100,
+        "task_deferred": 578,
+        "travel_plan": 11537,
+        "navigation_oscillation": 15,
+        "navigation_stuck": 427,
+        "target_unreachable": 253,
+        "combat_scan_empty": 641,
+        "gate_attempt": 189,
+        "gate_opened": 161,
+        "bury_bones": 128,
+        "bury_done": 127,
+        "summary": 60,
+        "heal_trigger": 30,
+        "ate_food": 60,
+        "path_failed": 423,
+        "flee_low_hp": 105,
+        "no_progress": 14,
+        "inv_full": 13,
+        "flee_trigger": 14,
+        "no_attack_timeout": 2,
+        "agility_unreachable": 74,
+        "obstacle_failed": 28,
+        "shear_timeout": 12,
+        "transport_started": 12,
+        "transport_fare": 12,
+        "transport_arrived": 12,
+        "transition_attempt": 2,
+        "transition_completed": 2,
+        "resource_missing": 11,
+        "watchdog": 4
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 16.77116828666668,
+        "p95Ms": 22.178358999997727,
+        "p99Ms": 34.27695500000118,
+        "maxMs": 2819.7259140000006,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 2.774665250999969,
+        "p95Ms": 5.9309269999994285,
+        "p99Ms": 8.72204199999942,
+        "maxMs": 141.39149299999917,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 16.233275314715733,
+        "p95Ms": 22.116684000000532,
+        "p99Ms": 33.01367500000197,
+        "maxMs": 240.74052199999278,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 2.7317931334447847,
+        "p95Ms": 5.9229749999940395,
+        "p99Ms": 8.579341000000568,
+        "maxMs": 84.59550700000545,
+        "over600ms": 0
+      },
+      "xpGained": 74570.79999999997,
+      "levelsGained": 305,
+      "botsWithXp": 71,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 20260.9,
+          "counters": {
+            "oscillation": 9,
+            "stationaryOscillation": 0,
+            "stuck": 60,
+            "timeoutMessages": 6,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 0,
+            "logLines": 200,
+            "logBytes": 24399,
+            "errors": 0,
+            "blockedStepsQueued": 2,
+            "noOpPathsQueued": 12,
+            "routesQueued": 3956,
+            "activeRoutesCleared": 1536,
+            "pathFailures": 62,
+            "noProgress": 1,
+            "taskDeferrals": 126,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 37915.90000000001,
+          "counters": {
+            "oscillation": 9,
+            "stationaryOscillation": 0,
+            "stuck": 130,
+            "timeoutMessages": 16,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 0,
+            "logLines": 370,
+            "logBytes": 48747,
+            "errors": 0,
+            "blockedStepsQueued": 7,
+            "noOpPathsQueued": 23,
+            "routesQueued": 7795,
+            "activeRoutesCleared": 3062,
+            "pathFailures": 152,
+            "noProgress": 4,
+            "taskDeferrals": 228,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 48682.5,
+          "counters": {
+            "oscillation": 11,
+            "stationaryOscillation": 0,
+            "stuck": 188,
+            "timeoutMessages": 26,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 3,
+            "logLines": 532,
+            "logBytes": 73012,
+            "errors": 0,
+            "blockedStepsQueued": 17,
+            "noOpPathsQueued": 41,
+            "routesQueued": 11324,
+            "activeRoutesCleared": 4518,
+            "pathFailures": 215,
+            "noProgress": 6,
+            "taskDeferrals": 323,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 58613.29999999999,
+          "counters": {
+            "oscillation": 14,
+            "stationaryOscillation": 0,
+            "stuck": 267,
+            "timeoutMessages": 36,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 5,
+            "logLines": 713,
+            "logBytes": 99400,
+            "errors": 0,
+            "blockedStepsQueued": 21,
+            "noOpPathsQueued": 53,
+            "routesQueued": 14896,
+            "activeRoutesCleared": 6026,
+            "pathFailures": 257,
+            "noProgress": 11,
+            "taskDeferrals": 402,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 68143.99999999997,
+          "counters": {
+            "oscillation": 15,
+            "stationaryOscillation": 0,
+            "stuck": 336,
+            "timeoutMessages": 46,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 5,
+            "logLines": 876,
+            "logBytes": 124692,
+            "errors": 0,
+            "blockedStepsQueued": 24,
+            "noOpPathsQueued": 67,
+            "routesQueued": 18345,
+            "activeRoutesCleared": 7566,
+            "pathFailures": 328,
+            "noProgress": 13,
+            "taskDeferrals": 476,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 74570.79999999997,
+          "counters": {
+            "oscillation": 15,
+            "stationaryOscillation": 0,
+            "stuck": 427,
+            "timeoutMessages": 56,
+            "timeoutDiagnostics": 0,
+            "missingSheepMessages": 5,
+            "logLines": 1069,
+            "logBytes": 153267,
+            "errors": 0,
+            "blockedStepsQueued": 28,
+            "noOpPathsQueued": 92,
+            "routesQueued": 21765,
+            "activeRoutesCleared": 9017,
+            "pathFailures": 423,
+            "noProgress": 14,
+            "taskDeferrals": 578,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        }
+      ],
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "cohorts": {
+        "progression": {
+          "count": 52,
+          "nativeXp": 43058.99999999996,
+          "withNativeXp": 51
+        },
+        "specialists": {
+          "count": 48,
+          "nativeXp": 30374.800000000003,
+          "withNativeXp": 11
+        }
+      },
+      "sampledFailureLocations": [
+        {
+          "task": "Smith",
+          "event": "navigation_stuck",
+          "at": [
+            2947,
+            3371,
+            0
+          ],
+          "destination": "2947,3367,0",
+          "count": 57
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3185,3444,0",
+          "count": 25
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3213,3247,0",
+          "count": 24
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3185,3444,0",
+          "count": 24
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2704,
+            3402,
+            2
+          ],
+          "destination": "2615,3332,0",
+          "count": 16
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2616,
+            3292,
+            1
+          ],
+          "destination": "2655,3283,0",
+          "count": 14
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3285,
+            3191,
+            2
+          ],
+          "destination": "3269,3163,0",
+          "count": 12
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2616,
+            3292,
+            1
+          ],
+          "destination": "3213,3247,0",
+          "count": 12
+        },
+        {
+          "task": "Social",
+          "event": "path_failed",
+          "at": [
+            2954,
+            3388,
+            2
+          ],
+          "destination": "3083,3420,0",
+          "count": 12
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            2616,
+            3292,
+            1
+          ],
+          "destination": "3052,3491,0",
+          "count": 11
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3234,
+            3299,
+            0
+          ],
+          "destination": "3237,3295,0",
+          "count": 10
+        },
+        {
+          "task": "Woodcut:1511",
+          "event": "navigation_stuck",
+          "at": [
+            3279,
+            3183,
+            0
+          ],
+          "destination": "3269,3163,0",
+          "count": 10
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2704,
+            3402,
+            2
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "PickupSpawn",
+          "event": "path_failed",
+          "at": [
+            3285,
+            3191,
+            2
+          ],
+          "destination": "3199,3218,0",
+          "count": 8
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            3285,
+            3191,
+            2
+          ],
+          "destination": "3302,3345,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2704,
+            3402,
+            2
+          ],
+          "destination": "3213,3247,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3278,
+            3500,
+            1
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3278,
+            3500,
+            1
+          ],
+          "destination": "3223,3238,0",
+          "count": 8
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            2616,
+            3292,
+            1
+          ],
+          "destination": "2976,3229,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3232,
+            3209,
+            0
+          ],
+          "destination": "3233,3208,0",
+          "count": 8
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            2899,
+            3424,
+            1
+          ],
+          "destination": "2946,3368,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            2899,
+            3424,
+            1
+          ],
+          "destination": "3213,3247,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3259,3237,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3221,
+            3474,
+            3
+          ],
+          "destination": "3206,3189,0",
+          "count": 8
+        },
+        {
+          "task": "Social",
+          "event": "path_failed",
+          "at": [
+            2954,
+            3388,
+            2
+          ],
+          "destination": "3185,3433,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3234,
+            3300,
+            0
+          ],
+          "destination": "3237,3295,0",
+          "count": 7
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3165,
+            3244,
+            0
+          ],
+          "destination": "3174,3246,0",
+          "count": 6
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3226,
+            3238,
+            0
+          ],
+          "destination": "3226,3240,0",
+          "count": 6
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3234,
+            3301,
+            0
+          ],
+          "destination": "3237,3295,0",
+          "count": 5
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3204,
+            3188,
+            0
+          ],
+          "destination": "3205,3188,0",
+          "count": 5
+        }
+      ],
+      "botNativeXp": [
+        {
+          "name": "sk1",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 725.0999999999992
+        },
+        {
+          "name": "sk2",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 880.2000000000003
+        },
+        {
+          "name": "sk3",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 262.5
+        },
+        {
+          "name": "sk4",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 889.0999999999988
+        },
+        {
+          "name": "sk5",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1197.7999999999995
+        },
+        {
+          "name": "sk6",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 872.4999999999998
+        },
+        {
+          "name": "sk7",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 827.8999999999987
+        },
+        {
+          "name": "sk8",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1612.5
+        },
+        {
+          "name": "sk9",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 546.8
+        },
+        {
+          "name": "sk10",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1079.4
+        },
+        {
+          "name": "sk11",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1450.5
+        },
+        {
+          "name": "sk12",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1268.8999999999987
+        },
+        {
+          "name": "sk13",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 361.6
+        },
+        {
+          "name": "fi1",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 634.1000000000001
+        },
+        {
+          "name": "fi2",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 555.7000000000004
+        },
+        {
+          "name": "fi3",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 161.20000000000005
+        },
+        {
+          "name": "fi4",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 697.0999999999992
+        },
+        {
+          "name": "fi5",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1281.4999999999957
+        },
+        {
+          "name": "fi6",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 337.3000000000001
+        },
+        {
+          "name": "fi7",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 36.300000000000004
+        },
+        {
+          "name": "fi8",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 453.1000000000005
+        },
+        {
+          "name": "fi9",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 953.3999999999969
+        },
+        {
+          "name": "fi10",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 587.2000000000003
+        },
+        {
+          "name": "fi11",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 982.6999999999981
+        },
+        {
+          "name": "fi12",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 750.8999999999992
+        },
+        {
+          "name": "fi13",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1271.9999999999986
+        },
+        {
+          "name": "ba1",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 525.9000000000003
+        },
+        {
+          "name": "ba2",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 748.6999999999991
+        },
+        {
+          "name": "ba3",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1343.499999999999
+        },
+        {
+          "name": "ba4",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 743.6999999999994
+        },
+        {
+          "name": "ba5",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 922.1999999999992
+        },
+        {
+          "name": "ba6",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 975.5999999999981
+        },
+        {
+          "name": "ba7",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1155.499999999996
+        },
+        {
+          "name": "ba8",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 890.7999999999997
+        },
+        {
+          "name": "ba9",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 840.6000000000007
+        },
+        {
+          "name": "ba10",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1013.7999999999981
+        },
+        {
+          "name": "ba11",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1111.999999999998
+        },
+        {
+          "name": "ba12",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 875.3
+        },
+        {
+          "name": "ba13",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1111.1
+        },
+        {
+          "name": "ra1",
+          "personality": "Random",
+          "nativeScriptXpGained": 534.6999999999999
+        },
+        {
+          "name": "ra2",
+          "personality": "Random",
+          "nativeScriptXpGained": 790.8999999999995
+        },
+        {
+          "name": "ra3",
+          "personality": "Random",
+          "nativeScriptXpGained": 641.7000000000003
+        },
+        {
+          "name": "ra4",
+          "personality": "Random",
+          "nativeScriptXpGained": 755.5999999999985
+        },
+        {
+          "name": "ra5",
+          "personality": "Random",
+          "nativeScriptXpGained": 1510.0999999999992
+        },
+        {
+          "name": "ra6",
+          "personality": "Random",
+          "nativeScriptXpGained": 1211.4999999999982
+        },
+        {
+          "name": "ra7",
+          "personality": "Random",
+          "nativeScriptXpGained": 901.6999999999991
+        },
+        {
+          "name": "ra8",
+          "personality": "Random",
+          "nativeScriptXpGained": 724.1000000000004
+        },
+        {
+          "name": "ra9",
+          "personality": "Random",
+          "nativeScriptXpGained": 275.69999999999993
+        },
+        {
+          "name": "ra10",
+          "personality": "Random",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ra11",
+          "personality": "Random",
+          "nativeScriptXpGained": 994.5000000000002
+        },
+        {
+          "name": "ra12",
+          "personality": "Random",
+          "nativeScriptXpGained": 642.8000000000002
+        },
+        {
+          "name": "ra13",
+          "personality": "Random",
+          "nativeScriptXpGained": 1139.6999999999964
+        },
+        {
+          "name": "war1",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war2",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 4907.799999999998
+        },
+        {
+          "name": "war3",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1095.8000000000002
+        },
+        {
+          "name": "war4",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2484.100000000001
+        },
+        {
+          "name": "war5",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2287.2000000000003
+        },
+        {
+          "name": "war6",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war7",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1918.2999999999997
+        },
+        {
+          "name": "war8",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3179.7999999999997
+        },
+        {
+          "name": "war9",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5078.6
+        },
+        {
+          "name": "war10",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3022
+        },
+        {
+          "name": "war11",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5282.500000000004
+        },
+        {
+          "name": "war12",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1113.3999999999999
+        },
+        {
+          "name": "ven1",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven2",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven3",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven4",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven5",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven6",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 5.3
+        },
+        {
+          "name": "ven7",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven8",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven9",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven10",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven11",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven12",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk1",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk2",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk3",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk4",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk5",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk6",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk7",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk8",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk9",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk10",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk11",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk12",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc1",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc2",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc3",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc4",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc5",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc6",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc7",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc8",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc9",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc10",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc11",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc12",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        }
+      ],
+      "rawReportSha256": "a6e3d5fcfa06b2ea29320dd196e5640d776b556e83874c07efdac167b6048cbc"
+    },
+    {
+      "melee": {
+        "damagingEngagements": 673,
+        "kills": 545,
+        "nativeXp": 10100,
+        "taskXp": 0,
+        "emptySearches": 496,
+        "travelProgress": 10311,
+        "deferrals": 156,
+        "unreachable": 30,
+        "noAttack": 2
+      },
+      "seed": 255,
+      "ticks": 6000,
+      "simulatedMinutes": 60,
+      "intervalMs": 0,
+      "wallSeconds": 131.99489493899998,
+      "version": "nav-release",
+      "sourceSha256": "43cd8d9414232669f2811746f3c83dbc2283d5d4fccd5832b27372b855525a20",
+      "featureSupport": {
+        "navigationRetry": true,
+        "taskDeferral": true
+      },
+      "revision": 254,
+      "config": {
+        "xprate": 1,
+        "progressiveXp": false,
+        "debug": false,
+        "logLevel": "info",
+        "verify": true,
+        "verifyFolder": true,
+        "verifyPack": true
+      },
+      "active": 100,
+      "counters": {
+        "oscillation": 0,
+        "stationaryOscillation": 0,
+        "stuck": 218,
+        "timeoutMessages": 59,
+        "timeoutDiagnostics": 45,
+        "missingSheepMessages": 3,
+        "logLines": 743,
+        "logBytes": 118042,
+        "errors": 0,
+        "blockedStepsQueued": 50,
+        "noOpPathsQueued": 56,
+        "routesQueued": 19081,
+        "activeRoutesCleared": 8110,
+        "pathFailures": 351,
+        "noProgress": 14,
+        "taskDeferrals": 551,
+        "subtaskDeferrals": 0,
+        "subtasksScheduled": 0
+      },
+      "navigationFailures": {
+        "Combat:navigation_stuck": 34,
+        "Vendor:path_failed": 29,
+        "Combat:no_progress": 9,
+        "Thieve:navigation_stuck": 77,
+        "Mine:no_progress": 1,
+        "PKer:navigation_stuck": 11,
+        "PKer:path_failed": 23,
+        "Combat:path_failed": 104,
+        "Thieve:path_failed": 50,
+        "ShopTrip:path_failed": 72,
+        "Firemaking:navigation_stuck": 71,
+        "Crafting:path_failed": 28,
+        "Mine:navigation_stuck": 3,
+        "Firemaking:path_failed": 2,
+        "ShopTrip:navigation_stuck": 16,
+        "ShopTrip:no_progress": 4,
+        "Social:path_failed": 5,
+        "Mine:path_failed": 11,
+        "Agility:path_failed": 19,
+        "Bank:path_failed": 8,
+        "Crafting:navigation_stuck": 2,
+        "EdgevillePKer:navigation_stuck": 2,
+        "Social:navigation_stuck": 2
+      },
+      "services": {
+        "bankOpened": 941,
+        "shopOpened": 155
+      },
+      "obstacles": {
+        "gateClicks": 89,
+        "gateScripts": 81,
+        "gateOpened": 75,
+        "gateUnverified": 6,
+        "transitionClicks": 1,
+        "transitionScripts": 1,
+        "transitionCompleted": 1,
+        "transitionUnverified": 0
+      },
+      "participation": {
+        "idleBotTicks": 23307,
+        "travelBotTicks": 274059,
+        "supportBotTicks": 529,
+        "activityBotTicks": 302105,
+        "progressionActivityBotTicks": 118415,
+        "agilityTaskBotTicks": 9032,
+        "nativeXpBotTicks": 9054,
+        "requestedTileArrivals": 4065,
+        "faresPaid": 30
+      },
+      "transportLegs": {
+        "karamja-sarim": {
+          "started": 1,
+          "arrived": 1,
+          "coins": 30
+        }
+      },
+      "nativeScriptXpGained": 72445.59999999996,
+      "taskCompletions": {
+        "ShopTrip": 128,
+        "Idle": 742,
+        "Bank": 9
+      },
+      "productionFingerprints": {
+        "tasks/CombatTask.ts": "38ee5800b4aadbbc221b1e0dbcc2265df816931a169a581f0309d1fc02a8c6cc",
+        "BotGoalPlanner.ts": "9fa4df2dd40baad9e3c570484f56f28641a9f7f8aa644479a3bd4c19f8562fb6",
+        "BotAction.ts": "5061a041b089cd6753767c3d0fdffe867e5ccd0d8066149f874fb45d5285910b",
+        "BotNavigation.ts": "daf2906e2ed1fc06a4492db7e292133bc5528539e571fecd708a69c59efa4319",
+        "BotLocalRoute.ts": "1b4dd5368c782e762ea485b863320b85ebc7a4620feb077e4e010f6d81d915bc",
+        "BotObstacles.ts": "09c44ed87076b9e6f0e346835968e7ed1fe9d072fdb8924d04e0d1a8809c9d0a",
+        "BotPlayer.ts": "49eef84750a44d0be2a54f7a6e0071e7f878c991dd0fd734c171f6654d1f2196",
+        "BotRouteRetry.ts": "b917cf3c2eb0cece73af1a3ba5d1c0022c3c3982ae504bf589793d5ca2cf6d78",
+        "BotDialogue.ts": "270b13847e747ac6c44b7d504fbf1851fd436d943b6998b3f66553048655a7df",
+        "BotTravel.ts": "dcd19d9e2fe10d07929d0d86c7a2faed5ae848cc22b6d0dc36dac13f1653ed8c",
+        "tasks/BotTaskBase.ts": "2c36ac245c1c39c7f0387def6d5d3e0822d5f67a76a548815f69e11fe5d955c3",
+        "tasks/WoodcuttingTask.ts": "2c4cd688f34f2c74a9e3a6cef13023430275f6f946b49834b7ac3a0420445855",
+        "tasks/MiningTask.ts": "8f7dc9ebe68cadbfed7dcad4f9e4744d798e9ffbbe4a6b6c33dc1ff748036436",
+        "tasks/FishingTask.ts": "ebf675f7005ee4c22ebab31999d398990cd0f3f5a1877096de4ca0bcb0c415e2",
+        "tasks/ShopTripTask.ts": "58e69297a1f2d7b1b736038f6173f97710398e32fb427712b8ecf40e0c962d93",
+        "tasks/SocialTask.ts": "972f9a211019f019fbbce29bbe2a5e5fd6b76123e400d0686a189ebade6d3127",
+        "tasks/AgilityTask.ts": "36958e71612a6ae7903874bde7e4e111764dbf3977ffb838a9ff37da8b8f8dc5"
+      },
+      "eventCounts": {
+        "detail": 45039,
+        "startup": 1,
+        "tutorial_completed": 100,
+        "task_deferred": 551,
+        "travel_plan": 10584,
+        "gate_attempt": 89,
+        "combat_scan_empty": 496,
+        "gate_opened": 84,
+        "navigation_stuck": 218,
+        "bury_bones": 135,
+        "bury_done": 130,
+        "summary": 60,
+        "heal_trigger": 32,
+        "ate_food": 63,
+        "timeouts": 45,
+        "path_failed": 351,
+        "no_progress": 14,
+        "no_attack_timeout": 2,
+        "target_unreachable": 30,
+        "flee_low_hp": 118,
+        "watchdog": 9,
+        "inv_full": 15,
+        "flee_trigger": 7,
+        "agility_unreachable": 16,
+        "transport_started": 1,
+        "resource_missing": 10,
+        "transport_fare": 1,
+        "transport_arrived": 1
+      },
+      "worldTiming": {
+        "count": 6000,
+        "meanMs": 20.880376586499796,
+        "p95Ms": 34.32795900000201,
+        "p99Ms": 51.20834299999842,
+        "maxMs": 2827.999006,
+        "over600ms": 1
+      },
+      "botTiming": {
+        "count": 6000,
+        "meanMs": 5.456393373000052,
+        "p95Ms": 18.070699999996577,
+        "p99Ms": 28.71372600000177,
+        "maxMs": 200.57325200000014,
+        "over600ms": 0
+      },
+      "steadyWorldTiming": {
+        "count": 5980,
+        "meanMs": 20.33072689632087,
+        "p95Ms": 34.2587910000002,
+        "p99Ms": 50.15307299999404,
+        "maxMs": 236.73837899999853,
+        "over600ms": 0
+      },
+      "steadyBotTiming": {
+        "count": 5980,
+        "meanMs": 5.390469778595368,
+        "p95Ms": 18.005059999995865,
+        "p99Ms": 28.420744000002742,
+        "maxMs": 119.06531600000017,
+        "over600ms": 0
+      },
+      "xpGained": 73488.59999999995,
+      "levelsGained": 313,
+      "botsWithXp": 69,
+      "verifiedSaves": 100,
+      "accounts": {
+        "count": 100
+      },
+      "samples": [
+        {
+          "tick": 1000,
+          "active": 100,
+          "xpGained": 17486.1,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 58,
+            "timeoutMessages": 9,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 0,
+            "logLines": 163,
+            "logBytes": 21709,
+            "errors": 0,
+            "blockedStepsQueued": 3,
+            "noOpPathsQueued": 1,
+            "routesQueued": 3187,
+            "activeRoutesCleared": 1216,
+            "pathFailures": 50,
+            "noProgress": 2,
+            "taskDeferrals": 114,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 2000,
+          "active": 100,
+          "xpGained": 33808.5,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 121,
+            "timeoutMessages": 19,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 0,
+            "logLines": 288,
+            "logBytes": 41503,
+            "errors": 0,
+            "blockedStepsQueued": 18,
+            "noOpPathsQueued": 2,
+            "routesQueued": 6515,
+            "activeRoutesCleared": 2697,
+            "pathFailures": 79,
+            "noProgress": 6,
+            "taskDeferrals": 206,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 3000,
+          "active": 100,
+          "xpGained": 43787,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 150,
+            "timeoutMessages": 29,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 1,
+            "logLines": 429,
+            "logBytes": 62887,
+            "errors": 0,
+            "blockedStepsQueued": 29,
+            "noOpPathsQueued": 48,
+            "routesQueued": 9682,
+            "activeRoutesCleared": 4100,
+            "pathFailures": 197,
+            "noProgress": 12,
+            "taskDeferrals": 299,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 4000,
+          "active": 100,
+          "xpGained": 54126.49999999999,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 167,
+            "timeoutMessages": 39,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 3,
+            "logLines": 533,
+            "logBytes": 81374,
+            "errors": 0,
+            "blockedStepsQueued": 36,
+            "noOpPathsQueued": 52,
+            "routesQueued": 12856,
+            "activeRoutesCleared": 5384,
+            "pathFailures": 233,
+            "noProgress": 13,
+            "taskDeferrals": 393,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 5000,
+          "active": 100,
+          "xpGained": 64837.89999999997,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 193,
+            "timeoutMessages": 49,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 3,
+            "logLines": 646,
+            "logBytes": 100589,
+            "errors": 0,
+            "blockedStepsQueued": 46,
+            "noOpPathsQueued": 56,
+            "routesQueued": 16036,
+            "activeRoutesCleared": 6782,
+            "pathFailures": 310,
+            "noProgress": 14,
+            "taskDeferrals": 485,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        },
+        {
+          "tick": 6000,
+          "active": 100,
+          "xpGained": 73488.59999999995,
+          "counters": {
+            "oscillation": 0,
+            "stationaryOscillation": 0,
+            "stuck": 218,
+            "timeoutMessages": 59,
+            "timeoutDiagnostics": 45,
+            "missingSheepMessages": 3,
+            "logLines": 743,
+            "logBytes": 118042,
+            "errors": 0,
+            "blockedStepsQueued": 50,
+            "noOpPathsQueued": 56,
+            "routesQueued": 19081,
+            "activeRoutesCleared": 8110,
+            "pathFailures": 351,
+            "noProgress": 14,
+            "taskDeferrals": 551,
+            "subtaskDeferrals": 0,
+            "subtasksScheduled": 0
+          }
+        }
+      ],
+      "sqliteIntegrity": {
+        "quick_check": "ok"
+      },
+      "cohorts": {
+        "progression": {
+          "count": 52,
+          "nativeXp": 44492.49999999995,
+          "withNativeXp": 52
+        },
+        "specialists": {
+          "count": 48,
+          "nativeXp": 27953.100000000006,
+          "withNativeXp": 11
+        }
+      },
+      "sampledFailureLocations": [
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3213,3247,0",
+          "count": 28
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3223,3238,0",
+          "count": 24
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3092,3245,0",
+          "count": 14
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3049,3491,0",
+          "count": 12
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3285,
+            3191,
+            2
+          ],
+          "destination": "3213,3247,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3098,
+            3266,
+            1
+          ],
+          "destination": "3231,3203,0",
+          "count": 8
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "3213,3247,0",
+          "count": 8
+        },
+        {
+          "task": "Agility",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "2474,3436,0",
+          "count": 8
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3234,3296,0",
+          "count": 8
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3193,
+            3440,
+            0
+          ],
+          "destination": "3194,3440,0",
+          "count": 7
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3195,
+            3439,
+            0
+          ],
+          "destination": "3195,3440,0",
+          "count": 7
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3253,3420,0",
+          "count": 7
+        },
+        {
+          "task": "Crafting",
+          "event": "path_failed",
+          "at": [
+            3215,
+            3218,
+            0
+          ],
+          "destination": "3013,3355,0",
+          "count": 7
+        },
+        {
+          "task": "ShopTrip",
+          "event": "navigation_stuck",
+          "at": [
+            3211,
+            3248,
+            0
+          ],
+          "destination": "3213,3247,0",
+          "count": 7
+        },
+        {
+          "task": "Thieve",
+          "event": "navigation_stuck",
+          "at": [
+            3227,
+            3242,
+            0
+          ],
+          "destination": "3227,3239,0",
+          "count": 7
+        },
+        {
+          "task": "Vendor",
+          "event": "path_failed",
+          "at": [
+            3179,
+            3438,
+            0
+          ],
+          "destination": "3180,3438,0",
+          "count": 7
+        },
+        {
+          "task": "Combat",
+          "event": "navigation_stuck",
+          "at": [
+            3176,
+            3206,
+            0
+          ],
+          "destination": "3205,3188,0",
+          "count": 6
+        },
+        {
+          "task": "PKer",
+          "event": "path_failed",
+          "at": [
+            3055,
+            3696,
+            0
+          ],
+          "destination": "3055,3700,0",
+          "count": 4
+        },
+        {
+          "task": "Thieve",
+          "event": "path_failed",
+          "at": [
+            3098,
+            3266,
+            1
+          ],
+          "destination": "3092,3245,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3098,
+            3266,
+            1
+          ],
+          "destination": "3211,3189,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3098,
+            3266,
+            1
+          ],
+          "destination": "3243,3296,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3208,
+            3225,
+            0
+          ],
+          "destination": "3171,3246,0",
+          "count": 4
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3229,
+            3196,
+            0
+          ],
+          "destination": "3231,3203,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "3046,3491,0",
+          "count": 4
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "3302,3341,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3048,3491,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "3182,3279,0",
+          "count": 4
+        },
+        {
+          "task": "ShopTrip",
+          "event": "path_failed",
+          "at": [
+            3231,
+            3291,
+            0
+          ],
+          "destination": "3231,3203,0",
+          "count": 4
+        },
+        {
+          "task": "Mine",
+          "event": "path_failed",
+          "at": [
+            3107,
+            9574,
+            0
+          ],
+          "destination": "3177,3363,0",
+          "count": 4
+        },
+        {
+          "task": "Combat",
+          "event": "path_failed",
+          "at": [
+            3109,
+            3354,
+            0
+          ],
+          "destination": "3233,3296,0",
+          "count": 4
+        }
+      ],
+      "botNativeXp": [
+        {
+          "name": "sk1",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 712.3999999999994
+        },
+        {
+          "name": "sk2",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1025.2999999999995
+        },
+        {
+          "name": "sk3",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 542.5
+        },
+        {
+          "name": "sk4",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1003.3999999999985
+        },
+        {
+          "name": "sk5",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 144
+        },
+        {
+          "name": "sk6",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 291.1000000000002
+        },
+        {
+          "name": "sk7",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 246
+        },
+        {
+          "name": "sk8",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 576
+        },
+        {
+          "name": "sk9",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 560
+        },
+        {
+          "name": "sk10",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1967.6999999999996
+        },
+        {
+          "name": "sk11",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 194.70000000000013
+        },
+        {
+          "name": "sk12",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 441.2
+        },
+        {
+          "name": "sk13",
+          "personality": "Skiller",
+          "nativeScriptXpGained": 1057.5000000000002
+        },
+        {
+          "name": "fi1",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 443.2000000000004
+        },
+        {
+          "name": "fi2",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1341.399999999998
+        },
+        {
+          "name": "fi3",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 727.3999999999988
+        },
+        {
+          "name": "fi4",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 265.8000000000002
+        },
+        {
+          "name": "fi5",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1791.199999999997
+        },
+        {
+          "name": "fi6",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 225.70000000000002
+        },
+        {
+          "name": "fi7",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 590.6999999999996
+        },
+        {
+          "name": "fi8",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1053.3999999999976
+        },
+        {
+          "name": "fi9",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 845.999999999998
+        },
+        {
+          "name": "fi10",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 243.5000000000001
+        },
+        {
+          "name": "fi11",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 601.5000000000002
+        },
+        {
+          "name": "fi12",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 204.1000000000001
+        },
+        {
+          "name": "fi13",
+          "personality": "Fighter",
+          "nativeScriptXpGained": 1142.299999999998
+        },
+        {
+          "name": "ba1",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 303.40000000000003
+        },
+        {
+          "name": "ba2",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1107.5999999999972
+        },
+        {
+          "name": "ba3",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1535.399999999999
+        },
+        {
+          "name": "ba4",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1036.0999999999967
+        },
+        {
+          "name": "ba5",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 505.19999999999993
+        },
+        {
+          "name": "ba6",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 633.8999999999999
+        },
+        {
+          "name": "ba7",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 518.2000000000002
+        },
+        {
+          "name": "ba8",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 670.0999999999997
+        },
+        {
+          "name": "ba9",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1556.4999999999977
+        },
+        {
+          "name": "ba10",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1215.899999999999
+        },
+        {
+          "name": "ba11",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 899.5999999999999
+        },
+        {
+          "name": "ba12",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 983.5999999999997
+        },
+        {
+          "name": "ba13",
+          "personality": "Balanced",
+          "nativeScriptXpGained": 1212.2999999999988
+        },
+        {
+          "name": "ra1",
+          "personality": "Random",
+          "nativeScriptXpGained": 750.4999999999998
+        },
+        {
+          "name": "ra2",
+          "personality": "Random",
+          "nativeScriptXpGained": 1202.9999999999964
+        },
+        {
+          "name": "ra3",
+          "personality": "Random",
+          "nativeScriptXpGained": 1392.3999999999985
+        },
+        {
+          "name": "ra4",
+          "personality": "Random",
+          "nativeScriptXpGained": 1016.1999999999969
+        },
+        {
+          "name": "ra5",
+          "personality": "Random",
+          "nativeScriptXpGained": 1565.1999999999982
+        },
+        {
+          "name": "ra6",
+          "personality": "Random",
+          "nativeScriptXpGained": 581.1000000000001
+        },
+        {
+          "name": "ra7",
+          "personality": "Random",
+          "nativeScriptXpGained": 773.4000000000005
+        },
+        {
+          "name": "ra8",
+          "personality": "Random",
+          "nativeScriptXpGained": 814.5999999999988
+        },
+        {
+          "name": "ra9",
+          "personality": "Random",
+          "nativeScriptXpGained": 698.7999999999987
+        },
+        {
+          "name": "ra10",
+          "personality": "Random",
+          "nativeScriptXpGained": 1560.3999999999974
+        },
+        {
+          "name": "ra11",
+          "personality": "Random",
+          "nativeScriptXpGained": 1003.8999999999985
+        },
+        {
+          "name": "ra12",
+          "personality": "Random",
+          "nativeScriptXpGained": 923.5999999999988
+        },
+        {
+          "name": "ra13",
+          "personality": "Random",
+          "nativeScriptXpGained": 1793.599999999997
+        },
+        {
+          "name": "war1",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 733.4999999999999
+        },
+        {
+          "name": "war2",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2397.599999999999
+        },
+        {
+          "name": "war3",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1261.8000000000002
+        },
+        {
+          "name": "war4",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2107.6000000000004
+        },
+        {
+          "name": "war5",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 1645.9000000000003
+        },
+        {
+          "name": "war6",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "war7",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 3421.0000000000005
+        },
+        {
+          "name": "war8",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2408.0000000000005
+        },
+        {
+          "name": "war9",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5096.000000000004
+        },
+        {
+          "name": "war10",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 2208.8
+        },
+        {
+          "name": "war11",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 5891.7
+        },
+        {
+          "name": "war12",
+          "personality": "Extras-edgeville_pker",
+          "nativeScriptXpGained": 781.1999999999998
+        },
+        {
+          "name": "ven1",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven2",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven3",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven4",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven5",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven6",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven7",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven8",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven9",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven10",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven11",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "ven12",
+          "personality": "Extras-vendor",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk1",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk2",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk3",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk4",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk5",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk6",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk7",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk8",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk9",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk10",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk11",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "pk12",
+          "personality": "Extras-pker",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc1",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc2",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc3",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc4",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc5",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc6",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc7",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc8",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc9",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc10",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc11",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        },
+        {
+          "name": "soc12",
+          "personality": "Extras-social",
+          "nativeScriptXpGained": 0
+        }
+      ],
+      "rawReportSha256": "650a931b5ba05d91266d44db0b1aaebd139228e4a8cd02eb2a216e531f887c94"
+    }
+  ]
+}

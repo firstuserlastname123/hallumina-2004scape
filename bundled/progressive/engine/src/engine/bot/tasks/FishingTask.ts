@@ -2,11 +2,12 @@
  * FishingTask.ts — Fish at spots, bank when full, progression-aware fishing loop.
  */
 
+import { findReachableNpc } from '#/engine/bot/BotAction.js';
+import { findNpcApproach } from '#/engine/bot/BotNavigation.js';
 import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask, Player, Npc, InvType,
     walkTo, interactNpc, interactNpcOp,
-    findNpcBySuffix,
     hasItem, countItem, isInventoryFull, isNear,
     getBaseLevel, PlayerStat,
     Items, Locations, getProgressionStep,
@@ -183,7 +184,7 @@ export class FishingTask extends BotTask {
 
         // ── Approach fishing spot ────────────────────────────────────────────
         if (this.state === 'approach') {
-            const spot = this._findFishSpot(player);
+            const spot = this.currentSpot?.isActive ? this.currentSpot : this._findFishSpot(player);
 
             if (!spot) {
                 this.scanFailTicks++;
@@ -200,9 +201,11 @@ export class FishingTask extends BotTask {
             this.currentSpot = spot;
 
             // move into range before interacting (important stability fix)
-            if (!isNear(player, spot.x, spot.z, 2)) {
+            if (!player.inOperableDistance(spot)) {
                 this.approachTicks++;
-                walkTo(player, spot.x, spot.z);
+                const route = findNpcApproach(player, spot);
+                if (!route) { this.currentSpot = null; return; }
+                walkTo(player, route.x, route.z, spot.level);
 
                 if (this.approachTicks > 25) {
                     // Can't reach this spot — reposition near the activity center
@@ -242,6 +245,7 @@ export class FishingTask extends BotTask {
                 this.lastXp = player.stats[PlayerStat.FISHING];
                 this.interactTicks = 0;
                 this.watchdog.notifyActivity();
+                if (this.currentSpot?.isActive && player.target === this.currentSpot) return;
                 // Re-validate the spot — if it moved or despawned, go to approach.
                 const nextSpot = this._findFishSpot(player);
                 if (nextSpot && isNear(player, nextSpot.x, nextSpot.z, 2)) {
@@ -330,7 +334,7 @@ export class FishingTask extends BotTask {
 
         const suffix = isRarefish ? '_rarefish' : isFreshwater ? '_freshfish' : '_saltfish';
 
-        return findNpcBySuffix(player.x, player.z, player.level, suffix, 20);
+        return findReachableNpc(player, 20, npc => NpcType.get(npc.type).debugname?.endsWith(suffix) ?? false);
     }
 
     private _interact(player: Player, spot: Npc): void {

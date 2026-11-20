@@ -2,6 +2,8 @@
  * MiningTask.ts — Mine rocks, bank ore, progress through tiers.
  */
 
+import { findLocApproach } from '#/engine/bot/BotNavigation.js';
+import { findReachableLoc } from '#/engine/bot/BotAction.js';
 import { BotLog } from '#/engine/bot/BotLog.js';
 import {
     BotTask,
@@ -10,7 +12,6 @@ import {
     InvType,
     walkTo,
     interactLoc,
-    findLocByPrefix,
     hasItem,
     isInventoryFull,
     isNear,
@@ -20,14 +21,11 @@ import {
     Items,
     Locations,
     getProgressionStep,
-    teleportToSafety,
     teleportNear,
     randInt,
     bankInvId,
-    INTERACT_TIMEOUT,
     StuckDetector,
     ProgressWatchdog,
-    openNearbyGate,
     botJitter,
     advanceBankWalk,
     hasStrayItems
@@ -187,7 +185,8 @@ export class MiningTask extends BotTask {
 
         // ── Approach rock ────────────────────────────────────────────────────
         if (this.state === 'approach') {
-            const rock = this._findRock(player);
+            const rock = this.currentRock?.isValid() && !LocType.get(this.currentRock.type).debugname?.includes('empty')
+                ? this.currentRock : this._findRock(player);
 
             if (!rock) {
                 this.scanFailTicks++;
@@ -205,7 +204,9 @@ export class MiningTask extends BotTask {
 
             if (!isAdjacentToLoc(player, rock)) {
                 this.approachTicks++;
-                walkTo(player, rock.x, rock.z);
+                const approach = findLocApproach(player, rock);
+                if (!approach) { this.currentRock = null; return; }
+                walkTo(player, approach.x, approach.z, rock.level);
 
                 if (this.approachTicks > 25) {
                     // Can't reach this rock — reposition near the activity center.
@@ -318,15 +319,10 @@ export class MiningTask extends BotTask {
 
         if (prefixes.length === 0) return null;
 
-        const allRocks: Loc[] = [];
-        for (const prefix of prefixes) {
-            const rock = findLocByPrefix(player.x, player.z, player.level, prefix, 15, 'empty');
-            if (rock) allRocks.push(rock);
-        }
-
-        if (allRocks.length === 0) return null;
-
-        return allRocks[Math.floor(Math.random() * allRocks.length)];
+        return findReachableLoc(player, 15, loc => {
+            const name = LocType.get(loc.type).debugname ?? '';
+            return !name.includes('empty') && prefixes.some(prefix => name.startsWith(prefix));
+        });
     }
 
     private _getAvailableOrePrefixes(player: Player): string[] {
@@ -407,15 +403,6 @@ export class MiningTask extends BotTask {
             return;
         }
 
-        if (openNearbyGate(player, 5)) return;
-
-        const dx = lx - player.x;
-        const dz = lz - player.z;
-
-        const escX = player.x + (Math.abs(dz) > Math.abs(dx) ? randInt(-10, 10) : dz > 0 ? 10 : -10);
-
-        const escZ = player.z + (Math.abs(dx) > Math.abs(dz) ? randInt(-10, 10) : dx > 0 ? 10 : -10);
-
-        walkTo(player, escX, escZ);
+        walkTo(player, lx, lz);
     }
 }

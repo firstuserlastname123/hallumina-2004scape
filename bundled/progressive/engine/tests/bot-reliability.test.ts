@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { findLocalRoute } from '#/engine/bot/BotLocalRoute.js';
 import { BotMovementMonitor } from '#/engine/bot/BotMovementMonitor.js';
 import { BotRouteRetry } from '#/engine/bot/BotRouteRetry.js';
 import { BotLogger } from '#/engine/bot/BotLog.js';
@@ -237,4 +238,27 @@ test('travel toward a stable gateway extends the stall deadline without replenis
     assert.equal(retry.failures, 1);
     retry.request(0, 150, 0, 30, -50, 0, 301);
     assert.equal(retry.intermediateTarget, null);
+});
+
+test('segment memory discourages backtracking without granting route progress', () => {
+    const retry = new BotRouteRetry();
+    retry.request(100, 100, 0, 200, 200, 0, 0);
+    retry.fail(1);
+    retry.rememberSegment(100, 100, 0, 2);
+    assert.ok(retry.segmentPenalty(105, 105, 0, 3) > 0);
+    assert.equal(retry.segmentPenalty(105, 105, 1, 3), 0);
+    assert.equal(retry.failures, 1);
+    assert.equal(retry.meaningfulTravelSerial, 0);
+    assert.equal(retry.segmentPenalty(100, 100, 0, 102), 0);
+    retry.reset();
+    assert.equal(retry.segmentPenalty(100, 100, 0, 3), 0);
+});
+
+test('a blocked local detour has a bounded collision-query budget', () => {
+    let queries = 0;
+    const path = findLocalRoute(0, 5000, 5000, 5060, 5060,
+        (_x, _z, nx, nz) => { queries++; return nx !== 5060 || nz !== 5060; },
+        (x, z) => x === 5060 && z === 5060);
+    assert.equal(path, null);
+    assert.ok(queries > 0 && queries <= 4096 * 8);
 });

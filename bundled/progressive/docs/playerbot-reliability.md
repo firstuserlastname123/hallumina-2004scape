@@ -1,5 +1,7 @@
 # Playerbot navigation and task reliability (r254)
 
+For the latest reachability, native obstacle recovery and paired population validation, see [Intelligent navigation](playerbot-intelligent-navigation.md).
+
 For the current melee encounter behavior, native XP measurements and r254 regression commands, see [Melee combat reliability](playerbot-melee-combat.md).
 
 This change targets `dev` at `1df577575837b7fb07900bf84402a5921dbe2182`.

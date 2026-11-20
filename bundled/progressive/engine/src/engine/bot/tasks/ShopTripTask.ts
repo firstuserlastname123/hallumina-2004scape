@@ -2,20 +2,20 @@
  * ShopTripTask.ts
  *
  * Walk to a shop NPC, trade, and buy a specific item.
- * Retries indefinitely until the item is purchased.
+ * Verifies the native shop interface and purchases only available native stock.
  * If coins run out, shouldRun() returns false and the planner re-routes.
  *
- * Stuck detection via StuckDetector catches both stationary bots and
- * oscillation (4-tile back-and-forth). After 5 failed escapes → teleport.
+ * Shared navigation owns bounded route recovery and task deferral.
  */
 
+import { findReachableNpc, npcMatchesName, interactIF_UseOp } from '#/engine/bot/BotAction.js';
+import { Interfaces } from '#/engine/bot/BotKnowledge.js';
+import { findNpcApproach } from '#/engine/bot/BotNavigation.js';
 import {
     BotTask, Player,
-    walkTo, interactNpcOp, findNpcByName,
-    hasItem, countItem, addItem, removeItem, isNear, isInventoryFull,
+    walkTo, interactNpcOp,
+    countItem, isNear, isInventoryFull,
     Items, Shops,
-    teleportToSafety, teleportNear, randInt, StuckDetector,
-    openNearbyGate,
 } from '#/engine/bot/tasks/BotTaskBase.js';
 
 export class ShopTripTask extends BotTask {
@@ -27,8 +27,8 @@ export class ShopTripTask extends BotTask {
 
     private state: 'walk' | 'find' | 'interact' | 'buy' | 'done' = 'walk';
     private waitTicks     = 0;
+    private purchased = 0;
     private findFailTicks = 0;
-    private readonly stuck = new StuckDetector(30, 4, 2);
 
     private static readonly NPC_NAMES: Record<string, string> = {
         BOB_AXES:            'bob',
@@ -77,8 +77,7 @@ export class ShopTripTask extends BotTask {
         // ── Walk to shop ──────────────────────────────────────────────────────
         if (this.state === 'walk') {
             if (!isNear(player, sx, sz, 8, sl)) {
-                this._stuckWalk(player, sx, sz);
-                walkTo(player, sx, sz);
+                walkTo(player, sx, sz, sl);
                 return;
             }
             this.state         = 'find';
@@ -88,20 +87,22 @@ export class ShopTripTask extends BotTask {
 
         // ── Find shop NPC ─────────────────────────────────────────────────────
         if (this.state === 'find') {
-            const npc = findNpcByName(player.x, player.z, player.level, this.npcName, 10);
+            const npc = findReachableNpc(player, 10, npc => npcMatchesName(npc, this.npcName));
             if (!npc) {
                 this.findFailTicks++;
                 walkTo(player, sx, sz);
-                // NPC not found for a long time — teleport to shop and retry
+                // A missing or unreachable service eventually yields to the planner.
                 if (this.findFailTicks >= 40) {
-                    teleportNear(player, sx, sz);
+                    (player as any)._bot?.deferCurrentTask('no reachable shopkeeper');
                     this.state         = 'find';
                     this.findFailTicks = 0;
-                    this.stuck.reset();
                 }
                 return;
             }
+            const route = findNpcApproach(player, npc)!;
             interactNpcOp(player, npc, 3); // op3 = Trade on all shops
+            player.clearWaypoints();
+            if (route.path.length) player.queueWaypoints(route.path);
             this.state     = 'interact';
             this.waitTicks = 0;
             return;
@@ -109,7 +110,12 @@ export class ShopTripTask extends BotTask {
 
         // ── Wait for shop to open ─────────────────────────────────────────────
         if (this.state === 'interact') {
-            if (++this.waitTicks >= 3) this.state = 'buy';
+            if (player.modalMain === Interfaces.SHOP) this.state = 'buy';
+            else if (++this.waitTicks >= 25 && !player.delayed && !player.activeScript) {
+                this.state = 'find';
+                this.findFailTicks++;
+                if (this.findFailTicks >= 3) (player as any)._bot?.deferCurrentTask('shop interaction unavailable');
+            }
             return;
         }
 
@@ -117,10 +123,11 @@ export class ShopTripTask extends BotTask {
         if (this.state === 'buy') {
             const bought = this._buy(player);
             if (bought > 0) {
-                this.state = 'done';
+                this.purchased += bought;
+                this.state = this.purchased >= this.quantity ? 'done' : 'buy';
             } else {
                 // Ran out of coins during journey — reset and let planner decide
-                this.state = 'walk';
+                (player as any)._bot?.deferCurrentTask('native shop purchase refused');
             }
         }
     }
@@ -132,40 +139,24 @@ export class ShopTripTask extends BotTask {
         this.state         = 'walk';
         this.waitTicks     = 0;
         this.findFailTicks = 0;
-        this.stuck.reset();
+        this.purchased = 0;
     }
 
     private _buy(player: Player): number {
-        const coins  = countItem(player, Items.COINS);
-        const canBuy = Math.min(this.quantity, Math.floor(coins / this.costEach));
-        if (canBuy <= 0) return 0;
-        removeItem(player, Items.COINS, canBuy * this.costEach);
-        const added = addItem(player, this.itemId, canBuy);
-        if (!added) {
-            // Inventory full — refund coins so we don't silently lose them.
-            // shouldRun() will now return false until the bot banks to free space.
-            addItem(player, Items.COINS, canBuy * this.costEach);
+        if (player.modalMain !== Interfaces.SHOP) return 0;
+        const listener = player.invListeners.find(listener => listener.com === Interfaces.SHOP_INV);
+        const stock = listener && player.getInventoryFromListener(listener);
+        if (!stock) return 0;
+        const slot = stock.items.findIndex(item => item?.id === this.itemId);
+        if (slot < 0 || (stock.get(slot)?.count ?? 0) <= 0) {
+            (player as any)._bot?.deferCurrentTask('shop stock unavailable');
             return 0;
         }
-        return canBuy;
+        const before = countItem(player, this.itemId);
+        // The native script enforces price, stock, ownership and room.
+        const remaining = this.quantity - this.purchased;
+        interactIF_UseOp(player, Interfaces.SHOP_INV, this.itemId, slot, remaining >= 10 ? 4 : remaining >= 5 ? 3 : 2);
+        return Math.max(0, countItem(player, this.itemId) - before);
     }
 
-    private _stuckWalk(player: Player, lx: number, lz: number): void {
-           if (!this.stuck.check(player, lx, lz)) {
-               walkTo(player, lx, lz);
-               return;
-           }
-           if (this.stuck.desperatelyStuck) {
-               teleportNear(player, lx, lz);
-               this.stuck.reset();
-               return;
-           }
-           if (openNearbyGate(player, 5)) return;
-   
-           const dx   = lx - player.x;
-           const dz   = lz - player.z;
-           const escX = player.x + (Math.abs(dz) > Math.abs(dx) ? randInt(-10, 10) : (dz > 0 ? 10 : -10));
-           const escZ = player.z + (Math.abs(dx) > Math.abs(dz) ? randInt(-10, 10) : (dx > 0 ? 10 : -10));
-           walkTo(player, escX, escZ);
-}
 }
