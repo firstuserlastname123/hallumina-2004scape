@@ -1,0 +1,503 @@
+{
+  "baseline": "90ed029b03e1f6d0d1fbbb6526d892b229f22742",
+  "date": "2026-11-20",
+  "runtime": {
+    "node": "24.22.1",
+    "chromium": "155.0.8059.79",
+    "tickMs": 600,
+    "xpRate": 1,
+    "progressiveXp": false,
+    "loginServer": true,
+    "seed": "unseeded native smoke test"
+  },
+  "upstreams": {
+    "rs-sdk": "3506b20cc767c6284375fb30390cb47b098d2c12",
+    "rs-sdk-r254-reference": "d37ae26080b7257a7ec766eb4b3bd00ed8be6a4c",
+    "rs2b0t": "27e57fa331656df5a0d9b7b1cd1f4ec0c44519bb"
+  },
+  "regressions": {
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 226096.710761,
+    "engineTypeScriptExistingErrors": 11,
+    "newEngineTypeScriptErrors": 0,
+    "webclientTypeScriptErrors": 0,
+    "verifiedContentBuild": true
+  },
+  "poc": {
+    "passed": true,
+    "wrongPasswordRejected": true,
+    "humanMovement": {
+      "before": {
+        "x": 3094,
+        "z": 3106,
+        "level": 0
+      },
+      "after": {
+        "x": 3095,
+        "z": 3107,
+        "level": 0
+      }
+    },
+    "humanBundleHasBridge": false,
+    "verifiedSaveCrcs": 102,
+    "restoredTutorial": 40,
+    "database": {
+      "quickCheck": {
+        "quick_check": "ok"
+      },
+      "accounts": {
+        "count": 102
+      },
+      "ordinary": [
+        {
+          "username": "pr7bot",
+          "ordinary": 1
+        },
+        {
+          "username": "pr7human",
+          "ordinary": 1
+        }
+      ]
+    },
+    "browserErrors": []
+  },
+  "steps": [
+    {
+      "name": "login",
+      "state": {
+        "position": {
+          "x": 3094,
+          "z": 3106,
+          "level": 0
+        },
+        "xp": [],
+        "inventory": []
+      }
+    },
+    {
+      "name": "native-tutorial-door",
+      "state": {
+        "position": {
+          "x": 3096,
+          "z": 3107,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": []
+      }
+    },
+    {
+      "name": "walk",
+      "state": {
+        "position": {
+          "x": 3104,
+          "z": 3098,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": []
+      },
+      "destination": {
+        "x": 3104,
+        "z": 3098
+      }
+    },
+    {
+      "name": "woodcutting",
+      "before": {
+        "position": {
+          "x": 3105,
+          "z": 3096,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          }
+        ]
+      },
+      "after": {
+        "position": {
+          "x": 3105,
+          "z": 3096,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          },
+          {
+            "slot": 2,
+            "id": 2511,
+            "name": "Logs",
+            "count": 1
+          }
+        ]
+      },
+      "tree": {
+        "id": 3033,
+        "x": 3106,
+        "z": 3096,
+        "typecode": 1123439682,
+        "name": "Tree",
+        "ops": [
+          "Chop down",
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "restart-reload",
+      "state": {
+        "position": {
+          "x": 3105,
+          "z": 3096,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          },
+          {
+            "slot": 2,
+            "id": 2511,
+            "name": "Logs",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ],
+  "concurrent": {
+    "revision": 254,
+    "tick": 193,
+    "minBots": 100,
+    "coexistTicks": 135,
+    "bots": 100,
+    "timing": {
+      "ticks": 188,
+      "mean": 47.62783018085163,
+      "p95": 123.40445400000317,
+      "max": 509.3904270000003,
+      "over600": 0
+    },
+    "settled": {
+      "ticks": 100,
+      "mean": 33.00511735000087,
+      "p95": 76.85746100000688,
+      "max": 125.12508699999307,
+      "over600": 0
+    },
+    "players": [
+      {
+        "name": "pr7bot",
+        "isBot": false,
+        "position": {
+          "x": 3105,
+          "z": 3096,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          11540,
+          0,
+          0,
+          0,
+          0,
+          250,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "tutorial": 40,
+        "inventory": [
+          {
+            "id": 1351,
+            "count": 1
+          },
+          {
+            "id": 590,
+            "count": 1
+          },
+          {
+            "id": 2511,
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "name": "pr7human",
+        "isBot": false,
+        "position": {
+          "x": 3095,
+          "z": 3107,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          11540,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "tutorial": 1,
+        "inventory": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  "priorShortAuthenticatedSmoke": {
+    "passed": true,
+    "coexistTicks": 35,
+    "timing": {
+      "ticks": 97,
+      "mean": 110.2975240824743,
+      "p95": 499.27266299999974,
+      "max": 1043.5697589999982,
+      "over600": 3
+    },
+    "note": "Independent earlier unseeded short run, same native gameplay/authentication and CRC checks; no settled-phase sampler. Not a paired performance baseline."
+  },
+  "originalPersistence": {
+    "unchanged": true,
+    "filesChecked": 2,
+    "existingCharacterSaveFiles": 0
+  },
+  "sourceSha256": {
+    "bundled/progressive/engine/tools/experiments/personal-bot-smoke.mjs": "792b2135043570b89f20f82cfdb3d43cb676f42127170b475e8bc4edf010e0c4",
+    "bundled/progressive/engine/tools/experiments/personal-bot-world.ts": "af42587a5fb007384e55b276a63703903af827b005a9a44253c5ba231cc1d5a1",
+    "bundled/progressive/webclient/experiments/personal-client.ts": "994559ce4e4effb0f8302fd97bb0ddc6414070373890cff4f8cf3608dca305ee"
+  },
+  "limits": [
+    "Independent r254 client adapter; neither current upstream runtime was connected unmodified.",
+    "Tutorial Island activity, not broad mainland skill/quest parity.",
+    "Scripted mouse/keyboard human-path smoke, no human participant or latency study.",
+    "Timing excludes first five cycles; settled phase requires both ordinary clients, completed activity and human design, and at least ten coexistence ticks.",
+    "No paired benchmark, VM test, long soak or local-model inference was performed."
+  ]
+}
