@@ -1,5 +1,7 @@
 # Reachability and native navigation on r254
 
+The [PR #6 navigation follow-up](playerbot-navigation-followup.md) contains the current corrections, 43-test validation and six new 6,000-tick comparisons. The initial implementation and measurements below are retained as the `dd8e4abd` snapshot.
+
 This change starts from merged `dev` at `f9424aeeec2004a7d779f1a65ca5461136a73d9b` (PR #5). It keeps the 100 configured characters and their personality weights. PKer, vendor and social task implementations, native content, collision data, XP formulas, tutorial enrollment, save formats and SQLite schemas are unchanged.
 
 ## Investigation
@@ -109,6 +111,6 @@ node --import tsx --test --test-concurrency=1 \
 
 Local reachability is exact within the native search and the supplementary CSV. Long-distance segment and remote-bank costs remain estimates; this is not an exhaustive world transport graph. A candidate beyond the bounded local shortlist can still be missed. Local detours can exhaust their search budget; they do not promise a route through arbitrary actor congestion or a closed barrier. Moving NPCs and changing collision can invalidate a route after selection. Unsupported crossings, quest restrictions, unaffordable fares, missing stock and exhausted routes still defer through native requirements.
 
-Repeated refusals remain around Draynor Manor (3109,3354), the Lumbridge castle interior (3215,3218), and several upstairs or underground positions. Selecting a different bank or shop cannot supply a missing native exit. Those cases still defer; no recovery teleport, quest override or fabricated progress conceals them. The machine-readable report retains task/destination samples for follow-up.
+The initial runs exposed repeated refusals around Draynor Manor (3109,3354), the Lumbridge castle interior (3215,3218), and several upstairs or underground positions. The [follow-up](playerbot-navigation-followup.md) corrects the empty-route fallback and adds verified native building/crypt routes and local door planning. Other unregistered exits still defer; no recovery teleport, quest override or fabricated progress conceals them. Both reports retain task/destination observations.
 
 The tests use isolated characters and databases. Accelerated population runs exercise full world ticks but retain existing wall-clock bot timers; a fixed RNG seed does not imply identical decisions across code changes or host schedules. They do not establish unattended multi-day behavior or human client latency. No legacy Tutorial Island character is migrated, and native scripted crossings are not recovery teleports.

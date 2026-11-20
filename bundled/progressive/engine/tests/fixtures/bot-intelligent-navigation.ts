@@ -12,7 +12,8 @@ const { BotPlayer } = await import('#/engine/bot/BotPlayer.js');
 const { BotGoalPlanner } = await import('#/engine/bot/BotGoalPlanner.js');
 const { BotCollisionMap } = await import('#/engine/bot/BotCollisionMap.js');
 const { setWorld } = await import('#/engine/bot/BotWorld.js');
-const { findTileRoute, chooseReachable, findLocApproach, findNpcApproach, botPathCost, canBotTravel } = await import('#/engine/bot/BotNavigation.js');
+const { findTileRoute, chooseReachable, findLocApproach, findNpcApproach, botPathCost, canBotTravel, trimPathAtCsvBlock, validateBotPath } = await import('#/engine/bot/BotNavigation.js');
+const { botFindPath, findPathToEntity } = await import('#/engine/GameMap.js');
 const { walkTo, countItem, nearbyLocs, findReachableLoc, findLocByName } = await import('#/engine/bot/BotAction.js');
 const { tryObstacle, pollObstacle, hasPendingObstacle } = await import('#/engine/bot/BotObstacles.js');
 const { CombatTask } = await import('#/engine/bot/tasks/CombatTask.js');
@@ -71,6 +72,40 @@ check('local routes avoid the native PLAYER blocker and respect its removal', ()
     } finally { rsmod.changePlayer(5021, 5020, 0, 1, false); }
     assert.equal(botPathCost(5020, 5020, findTileRoute(0, 5020, 5020, 5023, 5020)!.path), 3);
     void b;
+});
+check('empty CSV-trimmed tile prefix still searches for a legal detour', () => {
+    const csv = BotCollisionMap as any;
+    const packed = (5021 << 14) | 5020;
+    csv.blocked.add(packed);
+    try {
+        assert.equal(trimPathAtCsvBlock(0, botFindPath(0, 5020, 5020, 5023, 5020), 5020, 5020).length, 0);
+        const route = findTileRoute(0, 5020, 5020, 5023, 5020);
+        assert.ok(route, 'the first native step is rejected but a route around it exists');
+        assert.equal(validateBotPath(0, 5020, 5020, route.path), 'ok');
+    } finally { csv.blocked.delete(packed); }
+});
+check('empty CSV-trimmed NPC prefix still searches for a native operating face', () => {
+    const b = bot(3101, 3511);
+    const step = SkillProgression.ATTACK.find(step => step.extra?.npcType === 'man')!;
+    const task = new CombatTask(step, PlayerStat.ATTACK) as any;
+    const npc = task._findTargetNpc(b.player);
+    assert.ok(npc);
+    const route = findNpcApproach(b.player, npc)!;
+    assert.ok(route?.path.length);
+    const first = route.path[0];
+    const x = b.player.x + Math.sign(((first >> 14) & 0x3fff) - b.player.x);
+    const z = b.player.z + Math.sign((first & 0x3fff) - b.player.z);
+    const csv = BotCollisionMap as any, packed = (x << 14) | z;
+    assert.equal(csv.blocked.has(packed), false);
+    csv.blocked.add(packed);
+    try {
+        const detour = findNpcApproach(b.player, npc);
+        assert.equal(trimPathAtCsvBlock(b.player.level, findPathToEntity(b.player.level, b.player.x, b.player.z,
+            npc.x, npc.z, b.player.width, npc.width, npc.length), b.player.x, b.player.z).length, 0);
+        assert.ok(detour, 'a different native operating face is reachable');
+        assert.equal(validateBotPath(b.player.level, b.player.x, b.player.z, detour.path), 'ok');
+        assert.ok(detour.path.length);
+    } finally { csv.blocked.delete(packed); }
 });
 check('resource selection skips an enclosed tree and chooses another native operating face', () => {
     const b = bot(3165, 3416);

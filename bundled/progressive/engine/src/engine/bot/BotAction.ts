@@ -51,10 +51,11 @@ import NpcType from '#/cache/config/NpcType.js';
 import LocType from '#/cache/config/LocType.js';
 import InvType from '#/cache/config/InvType.js';
 import { getWorld } from '#/engine/bot/BotWorld.js';
-import { botWalkPath } from '#/engine/GameMap.js';
+import { findLocalRoute } from '#/engine/bot/BotLocalRoute.js';
+import { botWalkPath, reachedLoc } from '#/engine/GameMap.js';
 import { BotCollisionMap } from '#/engine/bot/BotCollisionMap.js';
 import { pollObstacle, hasPendingObstacle, isObstacleSuppressed, tryObstacle } from '#/engine/bot/BotObstacles.js';
-import { trimPathAtCsvBlock, findNearestWalkableTile, isBotTileBlocked, findTileRoute, botPathCost, validateBotPath, findLocApproach, findNpcApproach, chooseReachable } from '#/engine/bot/BotNavigation.js';
+import { trimPathAtCsvBlock, findNearestWalkableTile, isBotTileBlocked, findTileRoute, botPathCost, validateBotPath, findLocApproach, findNpcApproach, chooseReachable, canBotStep } from '#/engine/bot/BotNavigation.js';
 import { MoveSpeed } from '#/engine/entity/MoveSpeed.js';
 import VarPlayerType from '#/cache/config/VarPlayerType.js';
 import Obj from '#/engine/entity/Obj.js';
@@ -1724,6 +1725,7 @@ function _pathTowards(player: Player, destX: number, destZ: number): void {
     if (dist < 1) return;
     const direct = findTileRoute(player.level, player.x, player.z, destX, destZ);
     if (direct && _queueBotPath(player, direct.path)) return;
+    if (openDoorOnRoute(player, destX, destZ)) return;
     if (dist <= 100) {
         // Native move-near is useful when approaching a closed gate or a large
         // obstacle. Check its actual endpoint, so a returned source tile never
@@ -1855,6 +1857,10 @@ function _walkTo(player: Player, destX: number, destZ: number, level: number): v
             return;
         }
     }
+
+    // Verified local native crossings supplement the broad mainland gateway
+    // hints. Resolve the actual operating face, not the stair's occupied tile.
+    if (followNativeRoute(player, destX, destZ, level)) return;
 
     // Cancel any active engine interaction (setInteraction target) before setting
     // new waypoints.  Without this, processInteraction() re-routes the player back
@@ -3208,6 +3214,149 @@ export function setVarp(player: Player, varpName: string, varpId: number, varpVa
     }
 }
 
+/** Plan through closed wall doors, then execute only the first real click.
+ * Virtual door edges are never queued as walking steps or applied to collision.
+ * Replanning after native passage observes locks, one-way doors and changing locs.
+ */
+function openDoorOnRoute(player: Player, destX: number, destZ: number, target?: Loc): boolean {
+    if (Math.max(Math.abs(destX - player.x), Math.abs(destZ - player.z)) > 60) return false;
+    if (!target && isBotTileBlocked(player.level, destX, destZ)) return false;
+    const edges = new Map<string, Loc>();
+    const edge = (x: number, z: number, nx: number, nz: number) => `${x},${z}:${nx},${nz}`;
+    const doors = nearbyLocs(player, 32, loc => loc.shape === 0 && gateOp(loc) !== null && !isObstacleSuppressed(player, loc))
+        .sort((a, b) => Math.max(Math.abs(player.x - a.x), Math.abs(player.z - a.z)) -
+            Math.max(Math.abs(player.x - b.x), Math.abs(player.z - b.z))).slice(0, 24);
+    for (const loc of doors) {
+        const nx = loc.x + [-1, 0, 1, 0][loc.angle], nz = loc.z + [0, 1, 0, -1][loc.angle];
+        if (isBotTileBlocked(player.level, loc.x, loc.z) || isBotTileBlocked(player.level, nx, nz)) continue;
+        const name = LocType.get(loc.type).debugname;
+        // The one-way Manor entrance is useful for a Manor destination, never
+        // as a shortcut back into a building we have just left.
+        if ((name === 'haunteddoorl' || name === 'haunteddoorr') &&
+            !(destX >= 3097 && destX <= 3123 && destZ >= 3354 && destZ <= 3375)) continue;
+        const add = (x: number, z: number, tx: number, tz: number) => {
+            // r254 Manor entrances refuse exits; keep that native directionality.
+            if ((name === 'haunteddoorl' || name === 'haunteddoorr') && z > loc.z) return;
+            edges.set(edge(x, z, tx, tz), loc);
+        };
+        add(loc.x, loc.z, nx, nz); add(nx, nz, loc.x, loc.z);
+    }
+    if (!edges.size) return false;
+    const goal = target ? (x: number, z: number) => reachedLoc(player.level, x, z, target.x, target.z,
+        target.width, target.length, player.width, target.angle, target.shape, LocType.get(target.type).forceapproach) :
+        (x: number, z: number) => x === destX && z === destZ;
+    const plan = findLocalRoute(player.level, player.x, player.z, destX, destZ,
+        (x, z, nx, nz) => canBotStep(player.level, x, z, nx, nz) || edges.has(edge(x, z, nx, nz)), goal,
+        target ? Math.max(target.width, target.length) : 0);
+    if (!plan) return false;
+    let x = player.x, z = player.z;
+    for (const point of plan) {
+        const tx = (point >> 14) & 0x3fff, tz = point & 0x3fff;
+        while (x !== tx || z !== tz) {
+            const nx = x + Math.sign(tx - x), nz = z + Math.sign(tz - z);
+            if (!canBotStep(player.level, x, z, nx, nz)) {
+                const loc = edges.get(edge(x, z, nx, nz));
+                const op = loc ? gateOp(loc) : null;
+                return !!loc && !!op && _interactObstacle(player, loc, op);
+            }
+            x = nx; z = nz;
+        }
+    }
+    return false;
+}
+
+/** Native r254 routes: coordinates identify content, never relocate a character. */
+function followNativeRoute(player: Player, destX: number, destZ: number, level: number): boolean {
+    const inside = (x: number, z: number, bounds: number[]) => x >= bounds[0] && x <= bounds[1] && z >= bounds[2] && z <= bounds[3];
+    const castle = [3200, 3233, 3203, 3233];
+    const manor = [3097, 3123, 3354, 3375];
+    const crypt = [3072, 3090, 9760, 9780];
+    const towerCellar = [3090, 3125, 9560, 9590];
+    type Link = { x: number; z: number; name: string; option: string; to: number[] };
+    const links: Link[] = [];
+    const add = (x: number, z: number, name: string, option: string, to: number[]) => links.push({ x, z, name, option, to });
+    if (player.level === 0 && inside(player.x, player.z, [3212, 3216, 3214, 3224]) && !inside(destX, destZ, castle)) {
+        add(3217, 3218, 'openbankdoor_l', 'open', [3218, 3218, 0]);
+    }
+    if (inside(player.x, player.z, castle)) {
+        const targetFloor = inside(destX, destZ, castle) ? level : 0;
+        const up = player.level < targetFloor;
+        if (player.level !== targetFloor && player.level <= 2) {
+            for (const z of [3207, 3229]) {
+                const floor = player.level;
+                add(floor === 2 ? 3205 : 3204, floor === 2 && z === 3207 ? 3208 : z, floor === 0 ? 'loc_1738' : floor === 1 ? 'loc_1739' : 'loc_1740',
+                    up ? 'climb-up' : 'climb-down',
+                    [up && floor === 1 && z === 3229 ? 3206 : 3205, z === 3207 ? 3209 : up && floor === 1 ? 3229 : 3228, floor + (up ? 1 : -1)]);
+            }
+        }
+    }
+    if (inside(player.x, player.z, manor) && player.level === 2 && level < 2) {
+        add(3105, 3363, 'loc_1740', 'climb-down', [3106, 3363, 1]);
+    }
+    if (inside(player.x, player.z, manor) && player.level <= 1) {
+        if (player.level === 1 && (level === 0 || !inside(destX, destZ, manor))) {
+            add(3108, 3364, 'loc_1731', 'walk-down', [3108, 3360, 0]);
+        } else if (player.level === 0 && inside(destX, destZ, manor) && level >= 1) {
+            add(3108, 3363, 'loc_1730', 'walk-up', [3108, 3367, 1]);
+        } else if (player.level === 1 && inside(destX, destZ, manor) && level === 2) {
+            add(3104, 3362, 'loc_1738', 'climb-up', [3105, 3364, 2]);
+        } else if (player.level === 0 && inside(destX, destZ, crypt)) {
+            add(3115, 3357, 'cryptstairsdown', 'walk-down', [3077, 9771, 0]);
+        } else if (player.level === 0 && !inside(destX, destZ, manor) && destZ < 4100 &&
+            !findTileRoute(0, player.x, player.z, 3123, 3361)) {
+            // Front doors only admit entry. The ordinary back door is the exit.
+            add(3123, 3360, 'hauntedbackdoor', 'open', [3123, 3361, 0]);
+        }
+    }
+    if (player.level === 0 && inside(player.x, player.z, crypt) && !inside(destX, destZ, crypt)) {
+        add(3077, 9768, 'cryptstairsup', 'walk-up', [3115, 3356, 0]);
+    }
+    if (player.level === 0 && inside(player.x, player.z, towerCellar) && !inside(destX, destZ, towerCellar)) {
+        add(3103, 9576, 'wizards_tower_ladder', 'climb-up', [3105, 3162, 0]);
+    } else if (player.level === 0 && inside(destX, destZ, towerCellar)) {
+        add(3104, 3162, 'wizards_tower_laddertop', 'climb-down', [3104, 9576, 0]);
+    }
+    if (player.level === 1 && inside(player.x, player.z, [3096, 3104, 3263, 3271]) && level === 0) {
+        add(3100, 3266, 'loc_1723', 'climb-down', [3098, 3266, 0]);
+    }
+    if (player.level > 0 && inside(player.x, player.z, [3281, 3290, 3187, 3196]) && level < player.level) {
+        add(3286, 3192, player.level === 2 ? 'loc_1746' : 'loc_1748', 'climb-down', [3286, 3192, player.level - 1]);
+    }
+    const choices: { link: Link; loc: Loc; cost: number }[] = [];
+    for (const link of links) {
+        if (Math.max(Math.abs(player.x - link.x), Math.abs(player.z - link.z)) > 60) continue;
+        const loc = findLocByName(link.x, link.z, player.level, link.name, 0);
+        if (!loc || isObstacleSuppressed(player, loc)) continue;
+        const route = findLocApproach(player, loc);
+        if (!route) {
+            if (openDoorOnRoute(player, link.x, link.z, loc)) return true;
+            continue;
+        }
+        choices.push({ link, loc, cost: botPathCost(player.x, player.z, route.path) +
+            Math.max(Math.abs(destX - link.to[0]), Math.abs(destZ - link.to[1])) });
+    }
+    choices.sort((a, b) => a.cost - b.cost);
+    for (const { link, loc } of choices) {
+        const index = (LocType.get(loc.type).op ?? []).findIndex(op => op?.toLowerCase() === link.option);
+        if (index < 0) continue;
+        const crossing = link.to[2] !== player.level || (link.to[1] > 4100) !== (player.z > 4100)
+            ? { level: link.to[2], underground: link.to[1] > 4100 } : undefined;
+        if (_interactObstacle(player, loc, (index + 1) as 1 | 2 | 3 | 4 | 5, crossing)) {
+            (player as any)._bot?.navigation.clearIntermediate();
+            return true;
+        }
+    }
+    // A closed interior door can separate us from the verified exit. Approach
+    // that exit so the ordinary directional door handler sees the right corridor.
+    const next = links.sort((a, b) => Math.max(Math.abs(player.x - a.x), Math.abs(player.z - a.z)) -
+        Math.max(Math.abs(player.x - b.x), Math.abs(player.z - b.z)))[0];
+    if (next && Math.max(Math.abs(player.x - next.x), Math.abs(player.z - next.z)) <= 60) {
+        _pathTowards(player, next.x, next.z);
+        return player.hasWaypoints() || hasPendingObstacle(player);
+    }
+    return false;
+}
+
 /**
  * Scan within `radius` tiles for any loc with an option that matches keyword.
  * If already adjacent to the loc, find which specific option number matches
@@ -3290,6 +3439,9 @@ export function openGateToward(player: Player, destX: number, destZ: number, rad
     const dist = Math.hypot(dx, dz);
     if (dist < 1) return false;
     const gate = findReachableLoc(player, Math.min(radius, dist + 2), loc => {
+        const name = LocType.get(loc.type).debugname;
+        if ((name === 'haunteddoorl' || name === 'haunteddoorr') &&
+            (player.z > loc.z || !(destX >= 3097 && destX <= 3123 && destZ >= 3354 && destZ <= 3375))) return false;
         if (alongApproach) {
             // A wide gate's origin can be several tiles beside the crossing.
             const gx = Math.max(loc.x, Math.min(player.x, loc.x + loc.width - 1)) - player.x;

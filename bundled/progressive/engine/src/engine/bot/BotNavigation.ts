@@ -56,9 +56,11 @@ export function findTileRoute(level: number, srcX: number, srcZ: number, x: numb
     if (isBotTileBlocked(level, x, z)) return null;
     if (srcX === x && srcZ === z) return { x, z, path: new Uint32Array() };
     const path = trimPathAtCsvBlock(level, botFindPath(level, srcX, srcZ, x, z), srcX, srcZ);
-    if (!path.length) return null;
-    const end = path[path.length - 1];
-    if (((end >> 14) & 0x3fff) === x && (end & 0x3fff) === z && validateBotPath(level, srcX, srcZ, path) === 'ok') return { x, z, path };
+    // An empty native/CSV-trimmed prefix is not proof that every route fails.
+    if (path.length) {
+        const end = path[path.length - 1];
+        if (((end >> 14) & 0x3fff) === x && (end & 0x3fff) === z && validateBotPath(level, srcX, srcZ, path) === 'ok') return { x, z, path };
+    }
     const detour = findLocalRoute(level, srcX, srcZ, x, z,
         (x, z, nx, nz) => canBotStep(level, x, z, nx, nz), (tx, tz) => tx === x && tz === z);
     return detour ? { x, z, path: detour } : null;
@@ -70,19 +72,18 @@ export function findNpcApproach(player: Player, npc: Npc): BotApproach | null {
     if (player.inOperableDistance(npc)) return { x: player.x, z: player.z, path: new Uint32Array() };
     const path = trimPathAtCsvBlock(player.level, findPathToEntity(player.level, player.x, player.z,
         npc.x, npc.z, player.width, npc.width, npc.length), player.x, player.z);
-    if (!path.length) return null;
-    const end = path[path.length - 1];
-    const x = (end >> 14) & 0x3fff, z = end & 0x3fff;
-    if (!reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width) ||
-        validateBotPath(player.level, player.x, player.z, path) !== 'ok') {
-        const detour = findLocalRoute(player.level, player.x, player.z, npc.x, npc.z,
-            (x, z, nx, nz) => canBotStep(player.level, x, z, nx, nz),
-            (x, z) => reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width), Math.max(npc.width, npc.length));
-        if (!detour?.length) return null;
-        const end = detour[detour.length - 1];
-        return { x: (end >> 14) & 0x3fff, z: end & 0x3fff, path: detour };
+    if (path.length) {
+        const end = path[path.length - 1];
+        const x = (end >> 14) & 0x3fff, z = end & 0x3fff;
+        if (reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width) &&
+            validateBotPath(player.level, player.x, player.z, path) === 'ok') return { x, z, path };
     }
-    return { x, z, path };
+    const detour = findLocalRoute(player.level, player.x, player.z, npc.x, npc.z,
+        (x, z, nx, nz) => canBotStep(player.level, x, z, nx, nz),
+        (x, z) => reachedEntity(player.level, x, z, npc.x, npc.z, npc.width, npc.length, player.width), Math.max(npc.width, npc.length));
+    if (!detour?.length) return null;
+    const end = detour[detour.length - 1];
+    return { x: (end >> 14) & 0x3fff, z: end & 0x3fff, path: detour };
 }
 
 /** Bounded local choice; never treats a nearby but disconnected object as usable. */
