@@ -1,0 +1,640 @@
+{
+  "followUpBase": "a2504fd4caae10d96b24c786f5df12384a5c47cc",
+  "baselineDev": "90ed029b03e1f6d0d1fbbb6526d892b229f22742",
+  "scope": "Isolation and diagnostics follow-up; native r254 gameplay remains an independent client adapter, not upstream runtime compatibility.",
+  "runtime": {
+    "node": "v24.22.3",
+    "controllerInheritedEngineDebug": "true",
+    "chromium": "156.0.8078.79"
+  },
+  "revision": 254,
+  "tickMs": 600,
+  "xpRate": 1,
+  "regressions": {
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 249137.775117,
+    "existingEngineTypeScriptDiagnostics": 11,
+    "newEngineTypeScriptDiagnostics": 0,
+    "webclientTypeScriptDiagnostics": 0
+  },
+  "isolation": {
+    "rootReadOnly": true,
+    "networkInterfaces": [
+      "lo"
+    ],
+    "originalRuntimeVisible": false,
+    "runs": [
+      {
+        "listeners": [
+          {
+            "address": "127.0.0.1",
+            "port": 43021,
+            "family": "IPv4"
+          },
+          {
+            "address": "127.0.0.1",
+            "port": 44347,
+            "family": "IPv4"
+          }
+        ],
+        "management": "disabled (exactly two process-owned listening sockets)",
+        "probes": [
+          {
+            "method": "GET",
+            "url": "/maped",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "url": "/content/scripts/tutorial/configs/tutorial.constant",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "url": "/data/config/public.pem",
+            "status": 404
+          },
+          {
+            "method": "PUT",
+            "url": "/content/scripts/tutorial/configs/tutorial.constant",
+            "status": 404
+          },
+          {
+            "method": "PUT",
+            "url": "/content/pr7-write-probe",
+            "status": 404
+          }
+        ],
+        "copiedContentUnchanged": true
+      },
+      {
+        "listeners": [
+          {
+            "address": "127.0.0.1",
+            "port": 43021,
+            "family": "IPv4"
+          },
+          {
+            "address": "127.0.0.1",
+            "port": 44347,
+            "family": "IPv4"
+          }
+        ],
+        "management": "disabled (exactly two process-owned listening sockets)",
+        "probes": [
+          {
+            "method": "GET",
+            "url": "/maped",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "url": "/content/scripts/tutorial/configs/tutorial.constant",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "url": "/data/config/public.pem",
+            "status": 404
+          },
+          {
+            "method": "PUT",
+            "url": "/content/scripts/tutorial/configs/tutorial.constant",
+            "status": 404
+          },
+          {
+            "method": "PUT",
+            "url": "/content/pr7-write-probe",
+            "status": 404
+          }
+        ],
+        "copiedContentUnchanged": true
+      }
+    ]
+  },
+  "container": {
+    "image": "pr7-personal-bot:node24",
+    "imageId": "sha256:0043d86f5b3bdf80f0cc83d5a37526e0a6887952b797ac1d0f493d80260ec5a8",
+    "networkMode": "none",
+    "publishedPorts": [],
+    "readOnlyRootfs": true,
+    "mounts": [
+      {
+        "type": "disposable-volume",
+        "destination": "/experiment"
+      }
+    ],
+    "capDrop": [
+      "ALL"
+    ],
+    "noNewPrivileges": true,
+    "originalRuntimeUnchanged": true,
+    "originalDigests": {
+      "content": "0a4f4195e741d15c65e7eda062495de51caf64c82be9813f0be54157b6d7faca",
+      "engine/data": "f98b4b73651bfecd5a8e1726c4291a917565991768d811527bfb71efd2538a1b",
+      "engine/db.sqlite": "00e6da19f38f307525d92851c2287552ca6d614db7ab9b81db079274c714fa18",
+      "engine/db.sqlite-wal": "00e6da19f38f307525d92851c2287552ca6d614db7ab9b81db079274c714fa18",
+      "engine/db.sqlite-shm": "00e6da19f38f307525d92851c2287552ca6d614db7ab9b81db079274c714fa18"
+    },
+    "tmpfs": [
+      "/tmp"
+    ]
+  },
+  "additionalReadOnlyGuardProbe": {
+    "rootReadOnly": true,
+    "networkInterfaces": [
+      "lo"
+    ],
+    "originalRuntimeVisible": false,
+    "rootWriteRejected": "EROFS"
+  },
+  "directHostLaunchRejected": true,
+  "worldEngineDebug": false,
+  "managedBotDebug": false,
+  "poc": {
+    "passed": true,
+    "wrongPasswordRejected": true,
+    "humanMovement": {
+      "before": {
+        "x": 3094,
+        "z": 3106,
+        "level": 0
+      },
+      "after": {
+        "x": 3095,
+        "z": 3107,
+        "level": 0
+      }
+    },
+    "humanBundleHasBridge": false,
+    "verifiedSaveCrcs": 102,
+    "restoredTutorial": 40,
+    "database": {
+      "quickCheck": {
+        "quick_check": "ok"
+      },
+      "accounts": {
+        "count": 102
+      },
+      "ordinary": [
+        {
+          "username": "pr7bot",
+          "ordinary": 1
+        },
+        {
+          "username": "pr7human",
+          "ordinary": 1
+        }
+      ]
+    },
+    "browserErrors": []
+  },
+  "concurrent": {
+    "revision": 254,
+    "tick": 180,
+    "minBots": 100,
+    "coexistTicks": 134,
+    "listeners": [
+      {
+        "role": "login",
+        "address": "127.0.0.1",
+        "family": "IPv4",
+        "port": 43021
+      },
+      {
+        "role": "web",
+        "address": "127.0.0.1",
+        "family": "IPv4",
+        "port": 44347
+      }
+    ],
+    "engineDebug": false,
+    "managedBotDebug": false,
+    "bots": 100,
+    "timing": {
+      "ticks": 175,
+      "mean": 41.541943691428436,
+      "p95": 118.26184799999464,
+      "max": 463.85865100000046,
+      "over600": 0
+    },
+    "settled": {
+      "ticks": 100,
+      "mean": 33.655817190000015,
+      "p95": 81.18988700000045,
+      "max": 170.55661500000133,
+      "over600": 0
+    },
+    "players": [
+      {
+        "name": "pr7bot",
+        "isBot": false,
+        "position": {
+          "x": 3104,
+          "z": 3098,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          11540,
+          0,
+          0,
+          0,
+          0,
+          250,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "tutorial": 40,
+        "inventory": [
+          {
+            "id": 1351,
+            "count": 1
+          },
+          {
+            "id": 590,
+            "count": 1
+          },
+          {
+            "id": 2511,
+            "count": 1
+          },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "name": "pr7human",
+        "isBot": false,
+        "position": {
+          "x": 3095,
+          "z": 3107,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          11540,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "tutorial": 1,
+        "inventory": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "name": "login",
+      "state": {
+        "position": {
+          "x": 3094,
+          "z": 3106,
+          "level": 0
+        },
+        "xp": [],
+        "inventory": []
+      }
+    },
+    {
+      "name": "native-tutorial-door",
+      "state": {
+        "position": {
+          "x": 3097,
+          "z": 3107,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": []
+      }
+    },
+    {
+      "name": "walk",
+      "state": {
+        "position": {
+          "x": 3104,
+          "z": 3098,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": []
+      },
+      "destination": {
+        "x": 3104,
+        "z": 3098
+      }
+    },
+    {
+      "name": "woodcutting",
+      "before": {
+        "position": {
+          "x": 3103,
+          "z": 3097,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          }
+        ]
+      },
+      "after": {
+        "position": {
+          "x": 3104,
+          "z": 3098,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          },
+          {
+            "slot": 2,
+            "id": 2511,
+            "name": "Logs",
+            "count": 1
+          }
+        ]
+      },
+      "tree": {
+        "id": 3033,
+        "x": 3105,
+        "z": 3098,
+        "typecode": 1123439937,
+        "name": "Tree",
+        "ops": [
+          "Chop down",
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "restart-reload",
+      "state": {
+        "position": {
+          "x": 3104,
+          "z": 3098,
+          "level": 0
+        },
+        "xp": [
+          0,
+          0,
+          0,
+          1154,
+          0,
+          0,
+          0,
+          0,
+          25,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "inventory": [
+          {
+            "slot": 0,
+            "id": 1351,
+            "name": "Bronze axe",
+            "count": 1
+          },
+          {
+            "slot": 1,
+            "id": 590,
+            "name": "Tinderbox",
+            "count": 1
+          },
+          {
+            "slot": 2,
+            "id": 2511,
+            "name": "Logs",
+            "count": 1
+          }
+        ]
+      }
+    }
+  ],
+  "originalWorkspacePersistence": {
+    "filesChecked": [
+      "userdata/progressive-254/engine/db.sqlite",
+      "runtime/active/engine/db.sqlite"
+    ],
+    "unchanged": true,
+    "comparison": "Retained original workspace/userdata SQLite digests also match; the test input assembly itself had no live database or character saves."
+  },
+  "sourceSha256": {
+    "engine/src/web.ts": "21fcc42eaabe1beb8ec4584fbffcfe6f651af56e3221c1ecbd661c12a2028c6b",
+    "engine/src/server/login/LoginServer.ts": "5dd81fc02f5438b808f58179b61bd8448cd71d9118ec05d85fa87187fcf3211c",
+    "engine/tools/experiments/personal-bot-smoke.mjs": "5a81661da0c1c08d3dad587e659e6f46a8a910c75e4745f0099200e75ea1f9e3",
+    "engine/tools/experiments/personal-bot-world.ts": "93d2ec00d6a491b011e3d1acde63c3dd8d3ce831d19c2c8f745903b030703194",
+    "engine/tools/experiments/personal-bot-container.mjs": "a4f6327ac266fa0f374079d48747f05f69c75ffed418571c055766345b29eb60",
+    "engine/tools/experiments/Dockerfile.personal-bot": "ba51353e960ecac53ac9ed208b438bccbc5e03da8548de73d4844d314e8d8cee",
+    "webclient/experiments/personal-client.ts": "994559ce4e4effb0f8302fd97bb0ddc6414070373890cff4f8cf3608dca305ee"
+  },
+  "limits": [
+    "Short unseeded functional smoke and 100 settled coexistence ticks, not a paired performance benchmark or long soak.",
+    "General manual-action/event recording and equipment/quest event export remain a documented future design, not an implemented recorder.",
+    "Local Linux Docker, optional Playwright and the experimental image are development tooling only."
+  ]
+}

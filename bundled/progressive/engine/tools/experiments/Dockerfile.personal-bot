@@ -1,0 +1,5 @@
+# Optional experimental tooling only. No image is used by production startup.
+FROM node:24-trixie-slim
+RUN apt-get update && apt-get install -y --no-install-recommends chromium \
+    && rm -rf /var/lib/apt/lists/*
+ENV CHROMIUM_PATH=/usr/bin/chromium

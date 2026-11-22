@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
@@ -13,16 +13,22 @@ import { DatabaseSync } from 'node:sqlite';
 import { build } from 'esbuild';
 import forge from 'node-forge';
 import { hashSync } from 'bcrypt-ts';
+import { checkContainerIsolation, runInContainer } from './personal-bot-container.mjs';
 
 const engine = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const require = createRequire(import.meta.url);
+const resultPath = process.env.PERSONAL_BOT_RESULTS;
+if (!resultPath || !path.isAbsolute(resultPath)) throw new Error('Set PERSONAL_BOT_RESULTS to an absolute output JSON path');
+if (process.env.PERSONAL_BOT_CONTAINER !== '1') {
+    await runInContainer(engine, resultPath);
+    process.exit(0);
+}
+const isolation = checkContainerIsolation();
 // Optional tooling lives outside the production dependency graph.
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'r254-personal-bot-'));
-const resultPath = process.env.PERSONAL_BOT_RESULTS;
-if (!resultPath) throw new Error('Set PERSONAL_BOT_RESULTS to an absolute output JSON path');
-assert.ok(path.isAbsolute(resultPath));
-const results = { revision: 254, normalTickMs: 600, xprate: 1, steps: [], browserErrors: [] };
+const results = { revision: 254, normalTickMs: 600, xprate: 1, isolation,
+    runtime: { node: process.version, controllerInheritedEngineDebug: process.env.NODE_DEBUG }, steps: [], browserErrors: [] };
 let browser, child, log;
 const snapshots = {};
 
@@ -50,7 +56,10 @@ try {
     for (const name of ['src', 'tools', 'node_modules', 'package.json', 'tsconfig.json', 'view', 'public']) {
         fs.symlinkSync(path.join(engine, name), path.join(temp, name));
     }
-    for (const name of ['raw', 'config', 'pack', 'bot']) fs.symlinkSync(path.join(engine, 'data', name), path.join(temp, 'data', name));
+    // The native cache opens files with r+, so packs need a writable private
+    // copy too. No mutable data directory links back to the assembled source.
+    for (const name of ['raw', 'config', 'pack', 'bot']) fs.cpSync(path.join(engine, 'data', name), path.join(temp, 'data', name), { recursive: true, dereference: true });
+    fs.cpSync(path.resolve(engine, '../content'), path.join(temp, 'content'), { recursive: true, dereference: true });
     fs.writeFileSync(path.join(temp, '.personal-bot-disposable'), '');
     const db = new DatabaseSync(path.join(temp, 'db.sqlite'));
     for (const dir of fs.readdirSync(path.join(engine, 'prisma/singleworld/migrations')).sort()) {
@@ -85,9 +94,41 @@ try {
     const worldEnv = { ...process.env,
         NODE_PROFILE: 'external-framework-test', DB_BACKEND: 'sqlite', NODE_PRODUCTION: 'true', ENGINE_REVISION: '254',
         NODE_XPRATE: '1', NODE_PROGRESSIVE_XP: 'false', LOGIN_SERVER: 'true', FRIEND_SERVER: 'false', LOGGER_SERVER: 'false',
+        NODE_DEBUG: 'false', NODE_DEBUG_PROFILE: 'false', NODE_DEBUG_SOCKET: 'false', EASY_STARTUP: 'false', BUILD_STARTUP: 'false',
         LOGIN_PORT: String(loginPort), LOGIN_HOST: '127.0.0.1', WEB_PORT: String(port), WEB_ALLOWED_ORIGIN: `http://127.0.0.1:${port}`,
-        BUILD_SRC_DIR: path.resolve(engine, '../content'), BOT_DEBUG_ENABLED: 'false', BOT_LOG_LEVEL: 'off', NODE_FEATURE_GRANDEXCHANGE: 'false'
+        BUILD_SRC_DIR: path.join(temp, 'content'), BOT_DEBUG_ENABLED: 'false', BOT_LOG_LEVEL: 'off', NODE_FEATURE_GRANDEXCHANGE: 'false'
     };
+    function listeningSockets(pid) {
+        const inodes = new Set(fs.readdirSync(`/proc/${pid}/fd`).flatMap(fd => {
+            try { const socket = fs.readlinkSync(`/proc/${pid}/fd/${fd}`).match(/^socket:\[(\d+)\]$/); return socket ? [socket[1]] : []; }
+            catch { return []; }
+        }));
+        return ['tcp', 'tcp6'].flatMap(table => fs.readFileSync(`/proc/${pid}/net/${table}`, 'utf8').trim().split('\n').slice(1).flatMap(line => {
+            const fields = line.trim().split(/\s+/);
+            if (fields[3] !== '0A' || !inodes.has(fields[9])) return [];
+            const [hex, port] = fields[1].split(':');
+            const address = table === 'tcp' ? hex.match(/../g).reverse().map(byte => parseInt(byte, 16)).join('.') : hex;
+            return [{ address, port: parseInt(port, 16), family: table === 'tcp' ? 'IPv4' : 'IPv6' }];
+        })).sort((a, b) => a.port - b.port);
+    }
+    async function verifyIsolation() {
+        const listeners = listeningSockets(child.pid);
+        assert.deepEqual(listeners.map(s => s.port), [port, loginPort].sort((a, b) => a - b));
+        assert.ok(listeners.every(s => s.address === '127.0.0.1' && s.family === 'IPv4'));
+        const content = path.join(temp, 'content/scripts/tutorial/configs/tutorial.constant');
+        const before = fs.readFileSync(content);
+        const probes = [];
+        for (const [method, url] of [['GET', '/maped'], ['GET', '/content/scripts/tutorial/configs/tutorial.constant'],
+            ['GET', '/data/config/public.pem'], ['PUT', '/content/scripts/tutorial/configs/tutorial.constant'], ['PUT', '/content/pr7-write-probe']]) {
+            const response = await fetch(`http://127.0.0.1:${port}${url}`, { method, ...(method === 'PUT' ? { body: 'must not be written' } : {}) });
+            assert.equal(response.status, 404, `${method} ${url}`);
+            probes.push({ method, url, status: response.status });
+        }
+        assert.deepEqual(fs.readFileSync(content), before);
+        assert.equal(fs.existsSync(path.join(temp, 'content/pr7-write-probe')), false);
+        results.isolation.runs ??= [];
+        results.isolation.runs.push({ listeners, management: 'disabled (exactly two process-owned listening sockets)', probes, copiedContentUnchanged: true });
+    }
     async function start() {
         child = spawn(process.execPath, ['--import', 'tsx', path.join(engine, 'tools/experiments/personal-bot-world.ts')], {
             cwd: temp, stdio: ['ignore', log, log], env: worldEnv
@@ -96,11 +137,13 @@ try {
             if (child.exitCode !== null) throw new Error(`World exited ${child.exitCode}; see ${resultPath}.world.log`);
             try { return (await fetch(`http://127.0.0.1:${port}/crc`)).ok; } catch { return false; }
         }, 'world startup');
+        await verifyIsolation();
     }
     const observer = () => JSON.parse(fs.readFileSync(path.join(temp, 'observations.json'), 'utf8'));
     await start();
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true,
         args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+    results.runtime.chromium = browser.version();
     async function page(experimental) {
         const context = await browser.newContext({ viewport: { width: 1000, height: 800 } });
         const p = await context.newPage();

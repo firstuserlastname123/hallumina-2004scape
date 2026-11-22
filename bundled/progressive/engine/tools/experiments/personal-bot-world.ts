@@ -16,6 +16,10 @@ assert.equal(Environment.NODE_PROFILE, 'external-framework-test');
 assert.equal(Environment.ENGINE_REVISION, 254);
 assert.equal(Environment.NODE_XPRATE, 1);
 assert.equal(Environment.NODE_PROGRESSIVE_XP, false);
+assert.equal(Environment.NODE_DEBUG, false);
+assert.equal(Environment.NODE_PRODUCTION, true);
+assert.equal(Environment.EASY_STARTUP, false);
+assert.equal(process.env.PERSONAL_BOT_CONTAINER, '1');
 assert.ok(fs.existsSync('.personal-bot-disposable'));
 if (process.argv.includes('--verify-saves')) {
     const directory = `data/players/${Environment.NODE_PROFILE}`;
@@ -26,11 +30,12 @@ if (process.argv.includes('--verify-saves')) {
     process.exit(0);
 }
 assert.equal(Environment.LOGIN_SERVER, true);
-const loginServer = new LoginServer();
+const loginServer = new LoginServer({ host: '127.0.0.1', management: false });
 const listener = (loginServer as unknown as { server: import('ws').WebSocketServer }).server;
 if (!listener.address()) await once(listener, 'listening');
 const durations: number[] = [];
 const settledDurations: number[] = [];
+const bindings: { role: string; address: string; family: string; port: number }[] = [];
 let minBots = 100, coexistTicks = 0, stopping = false;
 const cycle = World.cycle.bind(World);
 World.cycle = () => {
@@ -46,7 +51,7 @@ World.cycle = () => {
         const personal = all.find(p => p.username === 'pr7bot' && !p.is_bot);
         if (bots === 100 && human && personal) {
             coexistTicks++;
-            if (coexistTicks >= 10 && human.getVar(VarPlayerType.getId('tutorial')) >= 1 &&
+            if (coexistTicks >= 10 && Number(human.getVar(VarPlayerType.getId('tutorial'))) >= 1 &&
                 personal.getVar(VarPlayerType.getId('tutorial')) === 40) settledDurations.push(duration);
         }
     }
@@ -57,6 +62,7 @@ function observe() {
     const settled = settledDurations.slice().sort((a, b) => a - b);
     return {
         revision: Environment.ENGINE_REVISION, tick: World.currentTick, minBots, coexistTicks,
+        listeners: bindings, engineDebug: Environment.NODE_DEBUG, managedBotDebug: Environment.BOT_DEBUG_ENABLED,
         bots: players.filter(p => p.is_bot).length,
         timing: { ticks: sorted.length, mean: sorted.reduce((a, b) => a + b, 0) / (sorted.length || 1),
             p95: sorted[Math.floor(sorted.length * .95)] ?? 0, max: sorted.at(-1) ?? 0, over600: sorted.filter(t => t > 600).length },
@@ -69,12 +75,23 @@ function observe() {
         }))
     };
 }
-const output = () => fs.writeFileSync('observations.json', JSON.stringify(observe(), null, 2));
+const output = () => {
+    fs.writeFileSync('observations.json.tmp', JSON.stringify(observe(), null, 2));
+    fs.renameSync('observations.json.tmp', 'observations.json');
+};
 const timer = setInterval(output, 600);
 process.on('exit', output);
 for (const signal of ['SIGTERM', 'SIGINT'] as const) process.on(signal, () => {
     stopping = true; clearInterval(timer); output(); World.rebootTimer(0);
 });
 await World.start();
-await startWeb();
+const web = await startWeb({ host: '127.0.0.1' });
+if (!web.listening) await once(web, 'listening');
+for (const [role, server] of [['login', listener], ['web', web]] as const) {
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+    assert.equal(address.address, '127.0.0.1');
+    bindings.push({ role, ...address });
+}
+output();
 console.log('personal-bot world ready');

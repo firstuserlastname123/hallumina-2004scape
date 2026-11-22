@@ -280,7 +280,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, wss: Web
                 overall: overall ? { level: overall.level, xp: overall.value, rank: overallRank } : null,
                 skills: skills.map(s => ({ ...s, rank: rankMap[s.type] ?? null })),
             });
-        } else if (fs.existsSync(`public${url.pathname}`)) {
+        } else if (fs.existsSync(`public${url.pathname}`) && fs.statSync(`public${url.pathname}`).isFile()) {
             return serveFile(res, `public${url.pathname}`, MIME_TYPES.get(path.extname(url.pathname)) ?? 'text/plain');
         }
     } else if (req.method === 'PUT') {
@@ -310,7 +310,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, wss: Web
     res.end();
 }
 
-export async function startWeb() {
+export async function startWeb(options: { host?: string } = {}) {
     const server = http.createServer((req, res) => {
         handleRequest(req, res, wss).catch(() => {
             res.writeHead(500);
@@ -386,7 +386,9 @@ export async function startWeb() {
         });
     });
 
-    server.listen(Environment.WEB_PORT);
+    if (options.host === undefined) server.listen(Environment.WEB_PORT);
+    else server.listen(Environment.WEB_PORT, options.host);
+    return server;
 }
 
 export async function startManagementWeb() {
