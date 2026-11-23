@@ -65,6 +65,19 @@ export async function runInContainer(engine, resultPath, suite = 'personal-bot-s
         for (const name of ['raw', 'config', 'pack', 'bot']) fs.cpSync(path.join(engine, 'data', name), path.join(stage, 'runtime/engine/data', name), { recursive: true, dereference: true });
         fs.cpSync(path.join(runtime, 'content'), path.join(stage, 'runtime/content'), { recursive: true, dereference: true });
         for (const name of ['src', 'experiments', 'tsconfig.json']) fs.cpSync(path.join(runtime, 'webclient', name), path.join(stage, 'runtime/webclient', name), { recursive: true, dereference: true });
+        if (process.env.PERSONAL_BOT_FIXTURE) {
+            assert.equal(suite, 'personal-controller-smoke.mjs');
+            const fixture = process.env.PERSONAL_BOT_FIXTURE;
+            assert.ok(path.isAbsolute(fixture) && fixture.endsWith('.character.sav'));
+            const manifest = JSON.parse(fs.readFileSync(fixture.replace(/\.sav$/, '.json'), 'utf8'));
+            assert.equal(manifest.schema, 'hallumina-native-test-character-v1');
+            assert.equal(manifest.account, 'pr7bot');
+            assert.ok(Number.isInteger(manifest.tutorial) && manifest.tutorial >= 0 && manifest.tutorial <= 1000);
+            assert.ok(Array.isArray(manifest.tutorialStages) && manifest.tutorialStages.includes(0));
+            assert.equal(createHash('sha256').update(fs.readFileSync(fixture)).digest('hex'), manifest.sha256);
+            fs.copyFileSync(fixture, path.join(stage, 'runtime/engine/.native-test-character.sav'));
+            fs.writeFileSync(path.join(stage, 'runtime/engine/.native-test-character.json'), JSON.stringify(manifest));
+        }
         // Optional browser tooling is copied too; no host directory is bind-mounted.
         const modulePath = process.env.PLAYWRIGHT_MODULE;
         assert.ok(!modulePath || path.isAbsolute(modulePath) || modulePath.startsWith('file:///'), 'PLAYWRIGHT_MODULE must be an absolute module path');
@@ -114,7 +127,7 @@ export async function runInContainer(engine, resultPath, suite = 'personal-bot-s
             await docker(['cp', `${container}:/experiment/results.json`, resultPath]);
             await docker(['cp', `${container}:/experiment/results.json.world.log`, `${resultPath}.world.log`]);
             if (suite === 'personal-controller-smoke.mjs') {
-                for (const suffix of ['.png', '.events.json']) {
+                for (const suffix of ['.png', '.completed.png', '.standard.png', '.events.json', '.diagnostics.json', '.character.sav', '.character.json']) {
                     try { await docker(['cp', `${container}:/experiment/results.json${suffix}`, `${resultPath}${suffix}`]); } catch { /* Optional failure artifacts. */ }
                 }
             }

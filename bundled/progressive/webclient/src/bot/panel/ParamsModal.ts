@@ -7,7 +7,7 @@ export class ParamsModal {
     constructor() { this.dialog.className = 'hb-dialog'; document.body.append(this.dialog); }
     open(meta: ScriptMeta, initial: Settings, start: (settings: Settings) => void): void {
         this.dialog.replaceChildren(); const form = el('form'); const controls = new Map<string, HTMLInputElement | HTMLSelectElement>();
-        form.append(el('h2', meta.name), el('p', meta.description), el('p', 'Log in normally, carry an axe, and stand near Draynor bank.', 'hb-muted'));
+        form.append(el('h2', meta.name), el('p', meta.description));
         for (const [key, def] of Object.entries(meta.settingsSchema)) {
             const label = el('label', def.label); let input: HTMLInputElement | HTMLSelectElement;
             if (def.type === 'string') {

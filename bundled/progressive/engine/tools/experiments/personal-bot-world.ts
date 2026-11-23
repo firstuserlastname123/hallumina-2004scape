@@ -29,6 +29,10 @@ if (process.argv.includes('--verify-saves')) {
     console.log(`verified-save-crcs ${files.length}`);
     process.exit(0);
 }
+const earnedSave = `data/players/${Environment.NODE_PROFILE}/pr7bot.sav`;
+if (fs.existsSync(earnedSave)) {
+    assert.equal(PlayerLoading.verify(new Packet(fs.readFileSync(earnedSave))), true, 'Earned native fixture CRC');
+}
 assert.equal(Environment.LOGIN_SERVER, true);
 const loginServer = new LoginServer({ host: '127.0.0.1', management: false });
 const listener = (loginServer as unknown as { server: import('ws').WebSocketServer }).server;

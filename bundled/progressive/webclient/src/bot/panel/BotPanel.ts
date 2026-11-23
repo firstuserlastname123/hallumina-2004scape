@@ -37,7 +37,7 @@ export class BotPanel {
         this.restore = button('Restore saved objective…', safe(() => {
             const account = runner.observation?.account; if (!account) return;
             const saved = runner.store.load(account), meta = saved && registry.get(saved.script);
-            if (saved && meta) this.params.open(meta, saved.settings, values => runner.start(meta, values, saved));
+            if (saved && meta) { this.selected = meta; this.params.open(meta, saved.settings, values => runner.start(meta, values, saved)); }
         }));
         this.root.append(controls, this.restore, this.notice, this.stats);
         const library = new ScriptLibrary(registry, meta => { this.selected = meta; this.notice.textContent = `Selected: ${meta.name}`; });
@@ -60,15 +60,17 @@ export class BotPanel {
     }
     render(): void {
         const r = this.runner, s = r.observation, active = r.state === 'running' || r.state === 'paused';
+        const meta = r.meta ?? this.selected, skill = meta?.skill && s?.skills[meta.skill.id];
         this.status.textContent = `${r.state.toUpperCase()} · ${r.status}`;
         this.start.disabled = active || !s?.ready; this.pause.disabled = r.state !== 'running'; this.resume.disabled = r.state !== 'paused'; this.stop.disabled = !active;
         this.restore.hidden = active || !s?.account || !r.store.load(s.account);
         this.notice.textContent = !s?.ready ? 'Log in through the game to use scripts.' : `Selected: ${this.selected?.name ?? 'None'}`;
         const stats = { Character: s?.account ?? 'Offline', Position: s?.position ? `${s.position.x}, ${s.position.z} · floor ${s.position.level}` : '—',
             Activity: s?.moving ? 'Moving' : s?.animation !== -1 ? `Animation ${s?.animation}` : 'Idle',
-            Woodcutting: s?.skills[8] ? `Lv ${s.skills[8].base} · ${s.skills[8].xp} XP` : '—',
-            Objective: r.meta ? `${r.progress.gathered} / ${r.settings.target || 'duration'} logs` : '—',
-            Banked: `${r.progress.banked} · ${r.progress.cycles} deposits`, Time: `${Math.floor(r.progress.elapsed / 60_000)}m ${Math.floor(r.progress.elapsed / 1000) % 60}s`,
+            Script: r.meta?.name ?? '—',
+            ...(meta?.skill ? { [meta.skill.name]: skill ? `Lv ${skill.base} · ${skill.xp} XP` : '—' } : {}),
+            Objective: r.meta?.progressUnit ? `${r.progress.gathered} / ${r.settings.target || 'duration'} ${r.meta.progressUnit}` : r.meta ? r.status : '—',
+            ...(r.settings.banking ? { Banked: `${r.progress.banked} · ${r.progress.cycles} deposits` } : {}), Time: `${Math.floor(r.progress.elapsed / 60_000)}m ${Math.floor(r.progress.elapsed / 1000) % 60}s`,
             Actions: `${r.lastResult?.action.kind ?? '—'} · ${r.lastResult?.state ?? '—'}`, 'Last success': r.lastSuccess?.action.kind ?? '—', Retries: String(r.retries) };
         this.stats.replaceChildren(...Object.entries(stats).flatMap(([key, value]) => [el('dt', key), el('dd', value)]));
         this.inventory.textContent = `${s?.inventory.length ?? 0}/28 slots. ${s?.inventory.map(i => `${i.count} ${i.name}`).join(', ') || 'Empty'}. Equipped: ${s?.equipment.map(i => i.name).join(', ') || 'None'}`;

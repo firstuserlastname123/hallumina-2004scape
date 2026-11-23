@@ -11,8 +11,8 @@ import { findApproach } from '../src/bot/adapter/collision.js';
 function observation(): Observation {
     return { version: 1, sequence: 0, at: Date.now(), account: 'ordinary', ready: true, position: { x: 3102, z: 3240, level: 0 }, inventory: [{ slot: 0, id: 1351, name: 'Bronze axe', count: 1, options: [] }],
         equipment: [], skills: Array.from({ length: 21 }, () => ({ xp: 0, base: 1, level: 1 })), npcs: [], groundItems: [], interfaces: [], quests: {}, bank: null, animation: -1, moving: false, health: 10,
-        objects: [{ id: 1276, name: 'Tree', options: ['Chop down'], x: 3103, z: 3241, level: 0, width: 1, length: 1 },
-            { id: 2213, name: 'Bank booth', options: ['Use', 'Use-quickly'], x: 3092, z: 3243, level: 0, width: 1, length: 1 }] };
+        objects: [{ id: 1276, name: 'Tree', options: ['Chop down'], x: 3081, z: 3265, level: 0, width: 1, length: 1 },
+            { id: 2213, name: 'Bank booth', options: ['Use', 'Use-quickly'], x: 3091, z: 3245, level: 0, width: 1, length: 1 }] };
 }
 class FakeGame implements GamePort {
     s = observation(); requests: ActionRequest[] = []; accept = true;
@@ -42,11 +42,11 @@ test('native collision indexing respects walls and blocked destinations', () => 
 });
 test('tree selection skips an unreachable closer tree and keeps protected inventory', () => {
     const { game, runner } = fixture();
-    game.s.objects.push({ ...game.s.objects[0], x: 3107 });
-    game.approach = tile => tile?.x === 3103 ? null : tile;
+    game.s.objects.push({ ...game.s.objects[0], x: 3084, z: 3266 });
+    game.approach = tile => tile?.x === 3081 ? null : tile;
     runner.start(woodcutting, {}); runner.pump();
     const action = game.requests.at(-1)!.action;
-    assert.equal(action.kind, 'object'); assert.equal(action.kind === 'object' && action.tile.x, 3107);
+    assert.equal(action.kind, 'object'); assert.equal(action.kind === 'object' && action.tile.x, 3084);
     assert.equal(game.s.inventory[0].id, 1351);
 });
 test('a click is pending until both native logs and XP arrive; no repeated chop clicks', () => {
@@ -111,7 +111,7 @@ test('missing axe, protected full inventory and unavailable trees fail safely', 
     const f = fixture(); f.game.s.inventory = []; f.runner.start(woodcutting, {}); assert.equal(f.runner.state, 'error'); assert.equal(f.game.requests.length, 0);
     const g = fixture(); g.game.s.inventory = Array.from({ length: 28 }, (_, i) => ({ ...g.game.s.inventory[0], slot: i }));
     g.runner.start(woodcutting, {}); g.runner.pump(); assert.equal(g.runner.state, 'paused');
-    const h = fixture(); h.game.s.objects = []; h.runner.start(woodcutting, {}); h.runner.pump(); assert.equal(h.game.requests.length, 0); assert.match(h.runner.status, /respawn/);
+    const h = fixture(); h.game.s.position = { x: 3083, z: 3264, level: 0 }; h.game.s.objects = []; h.runner.start(woodcutting, {}); h.runner.pump(); assert.equal(h.game.requests.length, 0); assert.match(h.runner.status, /respawn/);
 });
 test('black axes use the native r254 Woodcutting level requirement', () => {
     const { game, runner } = fixture(); game.s.inventory[0].id = 1361; game.s.skills[8].level = 6;
@@ -137,4 +137,43 @@ test('recorder is independent, opt-in, bounded and exports command/result eviden
     for (let i = 0; i < 5; i++) recorder.record('manual-command', { kind: 'object', id: i });
     const exported = JSON.parse(recorder.export()); assert.equal(exported.events.length, 3); assert.ok(exported.dropped > 0);
     assert.doesNotMatch(recorder.export(), /password|loginPass|token/); recorder.clear(); assert.equal(recorder.count, 0);
+});
+
+test('Draynor selection excludes southern trees and trees close to visible hazards', () => {
+    const { game, runner } = fixture();
+    game.s.position = { x: 3078, z: 3265, level: 0 };
+    game.s.objects.push({ ...game.s.objects[0], x: 3079, z: 3267 }, { ...game.s.objects[0], x: 3094, z: 3232 });
+    game.s.npcs.push({ index: 1, name: 'Jail guard', x: 3087, z: 3265, level: 0, options: ['Attack'] });
+    runner.start(woodcutting, {}); runner.pump();
+    const action = game.requests.at(-1)!.action;
+    assert.equal(action.kind, 'object'); assert.equal(action.kind === 'object' && action.tile.z, 3267);
+});
+test('nearby native Draynor threats yield before issuing a gathering command', () => {
+    const { game, runner } = fixture();
+    game.s.npcs.push({ index: 1, name: 'Dark wizard', ...game.s.position!, options: ['Attack'] });
+    runner.start(woodcutting, {}); runner.pump();
+    assert.equal(runner.state, 'paused'); assert.equal(game.requests.length, 0);
+});
+
+test('a full inventory outside bank visibility travels to the entrance before opening the bank', () => {
+    const { game, runner } = fixture(); game.s.position = { x: 3080, z: 3272, level: 0 };
+    const booth = game.s.objects[1]; game.s.objects = [];
+    game.s.inventory.push(...Array.from({ length: 27 }, (_, i) => logItem(i + 1)));
+    runner.start(woodcutting, {}); runner.pump();
+    assert.deepEqual(game.requests.at(-1)!.action, { kind: 'walk', tile: { x: 3092, z: 3250, level: 0 } });
+    runner.pump(); assert.equal(runner.lastResult?.state, 'pending'); assert.equal(game.requests.length, 1);
+    game.s.position = { x: 3092, z: 3250, level: 0 }; game.s.objects = [booth]; runner.pump();
+    const action = game.requests.at(-1)!.action; assert.equal(action.kind, 'object');
+    assert.equal(action.kind === 'object' && action.option, 'Use-quickly');
+});
+
+test('a late native level-up interrupts pending gathering and continues without a timeout or false reward', () => {
+    const { game, runner } = fixture(); runner.start(woodcutting, {}); runner.pump();
+    game.s.interfaces = [{ id: 4275, text: 'Click here to continue', options: [], buttonType: 6 },
+        { id: 4274, text: 'Congratulations, you just advanced a woodcutting level!', options: [], buttonType: 0 }];
+    runner.pump();
+    assert.equal(runner.recentResults.at(-1)?.state, 'interrupted');
+    assert.equal(runner.lastResult?.action.kind, 'dialogue'); assert.equal(runner.progress.gathered, 0);
+    assert.equal(runner.retries, 0); assert.equal(game.requests.filter(r => r.action.kind === 'object').length, 1);
+    runner.pump(); assert.equal(game.requests.length, 2, 'Continuation is also verified before another command');
 });

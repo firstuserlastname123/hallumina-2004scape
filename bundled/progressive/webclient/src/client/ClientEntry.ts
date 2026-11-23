@@ -160,3 +160,4 @@ if (SCROLLWHEEL_ZOOM_ENABLED) {
 }
 
 export { Client };
+export const namedClientFields = true;

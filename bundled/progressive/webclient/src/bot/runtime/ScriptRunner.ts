@@ -49,6 +49,7 @@ export class ScriptRunner {
             settings: this.settings, progress: this.progress, game: this.game,
             get pending() { return runner.pending; }, get lastResult() { return runner.lastResult; },
             act: (a, verify, timeout) => this.act(a, verify, timeout), status: text => { this.status = text; },
+            interruptPending: reason => this.settle('interrupted', reason),
             log: (text, level) => this.log(text, level), pause: reason => this.pause(reason), complete: reason => this.finish('completed', reason)
         };
         const runner = this;
@@ -89,7 +90,8 @@ export class ScriptRunner {
                     this.recorder.record('action-pending', { ...pending.result }, pending.before, s);
                 }
             }
-            if (!this.pendingAction && this.context && this.script) this.script.onTick(this.context, s);
+            if (this.context && this.script) this.script.onObservation?.(this.context, s);
+            if (this.state === 'running' && !this.pendingAction && this.context && this.script) this.script.onTick(this.context, s);
             if (now - this.lastSave > 3000) this.save();
         } catch (error) { this.fail(error); }
     }
@@ -100,7 +102,8 @@ export class ScriptRunner {
         this.remember(this.lastResult);
         this.recorder.record('action-result', this.lastResult, pending.before, after ?? undefined);
         if (state === 'success') { this.lastSuccess = this.lastResult; this.log(`${pending.result.action.kind}: verified`); }
-        else { this.retries++; this.log(`${pending.result.action.kind}: ${reason}`, 'warn'); }
+        else if (state === 'timeout' || state === 'blocked') { this.retries++; this.log(`${pending.result.action.kind}: ${reason}`, 'warn'); }
+        else this.log(`${pending.result.action.kind}: ${reason}`);
     }
     private remember(result: ActionResult): void {
         this.recentResults.push({ ...result });

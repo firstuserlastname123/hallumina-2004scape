@@ -23,7 +23,7 @@ function dispatch(action: number, a = 0, b = 0, d = 0) {
                 for (const code of [c.world.sceneType(c.minusedlevel, x, z), c.world.wallType(c.minusedlevel, x, z), c.world.gdType(c.minusedlevel, x, z)]) {
                     if (!code) continue;
                     const id = (code >> 14) & 0x7fff, type = LocType.list(id), wx = x + c.mapBuildBaseX, wz = z + c.mapBuildBaseZ;
-                    if (!s.objects.some((o: any) => o.id === id && o.x === wx && o.z === wz)) s.objects.push({ id, name: type.name, options: type.op ?? [], x: wx, z: wz, level: c.minusedlevel });
+                    if (!s.objects.some((o: any) => o.id === id && o.x === wx && o.z === wz)) s.objects.push({ id, name: type.name, options: type.op ?? [], x: wx, z: wz, level: c.minusedlevel, width: type.width, length: type.length });
                 }
             }
         }
@@ -40,7 +40,15 @@ function dispatch(action: number, a = 0, b = 0, d = 0) {
         if (a.kind === 'tab') { c.sideTab = a.tab; c.redrawSidebar = true; c.redrawSideicons = true; return; }
         if (a.kind === 'button') { const com = IfType.list[a.id]; dispatch(com.buttonType === 6 ? M.PAUSE_BUTTON : com.buttonType === 4 ? M.TOGGLE_BUTTON : M.IF_BUTTON, 0, 0, a.id); return; }
         if (a.kind === 'close') { dispatch(M.CLOSE_BUTTON); return; }
-        if (a.kind === 'npc') { dispatch([M.OP_NPC1, M.OP_NPC2, M.OP_NPC3, M.OP_NPC4, M.OP_NPC5][a.op ?? 0], a.index); return; }
+        if (a.kind === 'npc') {
+            if (a.approach) {
+                const npc = s.npcs.find((n: any) => n.index === a.index);
+                const tile = npc && c.personalController.game.approach(npc, 1, 1);
+                if (!tile) return false;
+                if (tile.x !== s.position.x || tile.z !== s.position.z) return c.tryMove(c.localPlayer.routeX[0], c.localPlayer.routeZ[0], tile.x - c.mapBuildBaseX, tile.z - c.mapBuildBaseZ, false, 0, 0, 0, 0, 0, 0);
+            }
+            dispatch([M.OP_NPC1, M.OP_NPC2, M.OP_NPC3, M.OP_NPC4, M.OP_NPC5][a.op ?? 0], a.index); return;
+        }
         if (a.kind === 'object' || a.kind === 'use-object') {
             const o = s.objects.find((o: any) => o.id === a.id && o.x === a.x && o.z === a.z); if (!o) return false;
             const x = o.x - c.mapBuildBaseX, z = o.z - c.mapBuildBaseZ, code = c.world.sceneType(c.minusedlevel, x, z) || c.world.wallType(c.minusedlevel, x, z) || c.world.gdType(c.minusedlevel, x, z);

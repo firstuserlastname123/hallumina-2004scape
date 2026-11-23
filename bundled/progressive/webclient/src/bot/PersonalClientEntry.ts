@@ -1,4 +1,5 @@
 import { Client as NativeClient } from '../client/ClientEntry.js';
+export { namedClientFields } from '../client/ClientEntry.js';
 import { R254Adapter } from './adapter/R254Adapter.js';
 import { ScriptRegistry } from './runtime/ScriptRegistry.js';
 import { ScriptRunner } from './runtime/ScriptRunner.js';

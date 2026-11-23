@@ -41,11 +41,16 @@ async function bunBuild(entry: string, external: string[] = [], minify = true, d
     };
 }
 
-async function applyTerser(script: BunOutput, mangleProperties = true): Promise<boolean> {
+async function applyTerser(script: BunOutput, mangleProperties = true, output = 'client.js'): Promise<boolean> {
     const mini = await minify(script.source, {
         sourceMap: {
-            content: script.sourcemap
+            content: script.sourcemap,
+            filename: output,
+            url: `${output}.map`
         },
+        format: output === 'personal-client.js' ? {
+            preamble: '/*! Includes MIT-licensed rs2b0t adaptations. Copyright (c) 2026 N64Jive. See personal-client.NOTICE.txt. */'
+        } : {},
         toplevel: true,
         // format: {
         //     beautify: true
@@ -151,9 +156,9 @@ for (const { file, output } of entrypoints) {
     const script = await bunBuild(file, [], prod, prod ? ['console'] : []);
     if (script) {
         if (prod) {
-            // The optional bundle exports versioned JSON contracts and uses typed native
-            // field bindings. Keep their names stable; ordinary client packaging is unchanged.
-            await applyTerser(script, output !== 'personal-client.js');
+            // Both game bundles share native page input hooks. Stable property names
+            // avoid coupling the HTML to Terser's build-dependent property aliases.
+            await applyTerser(script, output === 'mapview.js', output);
         }
 
         fs.writeFileSync(`out/${output}`, script.source);

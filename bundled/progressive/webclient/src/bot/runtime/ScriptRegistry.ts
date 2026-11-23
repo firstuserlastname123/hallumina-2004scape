@@ -3,6 +3,7 @@ import type { BotScript } from '../api/Script.js';
 import type { SettingsSchema } from './Settings.js';
 export interface ScriptMeta {
     id: string; name: string; description: string; version: string; category: string; tags: readonly string[];
+    progressUnit?: string; skill?: { id: number; name: string };
     settingsSchema: SettingsSchema; create(): BotScript;
 }
 export class ScriptRegistry {

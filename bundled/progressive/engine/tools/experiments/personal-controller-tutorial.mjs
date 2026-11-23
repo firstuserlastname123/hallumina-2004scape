@@ -22,10 +22,11 @@ export async function finishTutorial(page, results, ids, readStage) {
         if (stage === undefined) { await delay(600); continue; }
         results.setupLatest = { stage, position: s.position, main: s.main, chat: s.chat, messages: s.messages, inventory: s.inventory, components: s.components.filter(c => c.buttonType > 0 || c.text) };
         if (stage !== previous) { console.log('Native tutorial stage', stage, s.position); results.tutorial.push({ stage, at: Date.now(), position: s.position }); previous = stage; changedAt = Date.now(); }
-        if (stage === 1000) { assert.ok(results.tutorial.some(s => s.stage === 660), 'Must cast successfully before leaving'); return s; }
+        if (stage === 1000) { assert.ok(results.tutorial.some(s => s.stage === 660) || results.characterFixture?.tutorialStages.includes(660), 'Must cast successfully before leaving'); return s; }
         if (Date.now() - changedAt > ([430, 440, 460].includes(stage) ? 180_000 : 90_000)) throw new Error(`Tutorial stalled at ${stage}: ${JSON.stringify(s)}`);
         const button = s.components.find(c => c.clientCode === 326) ||
             (stage === 1 ? s.components.find(c => /No, thank you/.test(c.text)) : null) ||
+            ([500, 670].includes(stage) ? s.components.find(c => c.buttonType === 1 && /^Yes\.$/.test(c.text.trim())) : null) ||
             s.components.find(c => c.buttonType === 6);
         if (button) { await command({ kind: 'button', id: button.id }); await delay(800); continue; }
         if (s.moving || s.animation !== -1 || Date.now() - lastCommandAt < 3000) { await delay(600); continue; }
@@ -33,7 +34,7 @@ export async function finishTutorial(page, results, ids, readStage) {
         const nearest = list => list.sort((a, b) => Math.max(Math.abs(a.x - s.position.x), Math.abs(a.z - s.position.z)) - Math.max(Math.abs(b.x - s.position.x), Math.abs(b.z - s.position.z)))[0];
         const npc = (name, option = 'Talk-to') => {
             const n = nearest(s.npcs.filter(n => n.name === name));
-            return n ? command({ kind: 'npc', index: n.index, op: n.options.indexOf(option) }).then(() => true) : false;
+            return n ? command({ kind: 'npc', index: n.index, op: n.options.indexOf(option), approach: true }).then(() => true) : false;
         };
         const object = (name, option) => {
             const o = nearest(s.objects.filter(o => typeof name === 'number' ? o.id === name : o.name === name));
@@ -107,9 +108,12 @@ export async function finishTutorial(page, results, ids, readStage) {
             case 410: await tab(0); break;
             case 420: await object(ids.newbiedoor5_l); break;
             case 430: case 440: await attackRat(); break;
-            case 450:
-                if (s.position.x > 3110) await object(ids.newbiedoor5_l); else await npc('Combat Instructor');
+            case 450: {
+                const guide = s.npcs.find(n => n.name === 'Combat Instructor');
+                const reachable = guide && await page.evaluate(n => !!globalThis.__gameClient.personalController.game.approach(n, 1, 1), guide);
+                if (!reachable) await object(ids.newbiedoor5_l); else await npc('Combat Instructor');
                 break;
+            }
             case 460:
                 if (item('Shortbow')) await equip('Shortbow');
                 else if (item('Bronze arrow')) await equip('Bronze arrow');
@@ -120,9 +124,13 @@ export async function finishTutorial(page, results, ids, readStage) {
             case 510: if (s.main !== -1) await command({ kind: 'close' }); else await object(ids.newbie_door6); break;
             case 520: await npc('Financial Advisor'); break;
             case 530: await object(ids.newbie_door7); break;
-            case 540:
-                if (s.position.x < 3120) await walk(3122, 3107); else if (!(await npc('Brother Brace'))) await walk(3124, 3107);
+            case 540: {
+                const brother = s.npcs.find(n => n.name === 'Brother Brace');
+                const reachable = brother && await page.evaluate(n => !!globalThis.__gameClient.personalController.game.approach(n, 1, 1), brother);
+                if (!reachable) await object(1519, 'Open'); // Native east chapel entrance, not the tutorial-gated exit.
+                else await npc('Brother Brace');
                 break;
+            }
             case 550: await tab(5); break;
             case 560: await npc('Brother Brace'); break;
             case 570: await tab(8); break;

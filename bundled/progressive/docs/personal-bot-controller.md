@@ -19,6 +19,21 @@ standard client. The build additionally writes `out/personal-client.js`, its
 source map, and `out/personal-client.NOTICE.txt`. The normal client entry does
 not import the personal controller.
 
+The engine launcher's webclient build and GE staging both publish the complete
+build into `engine/public/client`, including the optional bundle, source maps,
+MIT notice and MIDI WASM. A manual optional-only build needs this publishing step:
+
+```sh
+cd ../engine
+node --import tsx tools/client/PublishWebclient.ts --personal
+```
+
+Omit `--personal` after a full `bun run build`. The publisher validates every
+required output before copying; each file is replaced with an atomic rename.
+Both rebuilt game bundles retain native property names for the page's existing
+input/camera hooks. The page also supports the previously published standard
+bundle's aliases.
+
 Start Hallumina normally. On its existing localhost game page, choose **Personal
 bot client**, or append `personalBot=1` to that page's query string, for example
 `http://localhost:8888/rs2.cgi?lowmem=1&personalBot=1` (use your configured port).
@@ -33,8 +48,9 @@ engine manually; the upstream engine's generic default is different.
 ## Woodcutting
 
 Complete Tutorial Island normally, bring an axe, and travel to the ground floor
-near Draynor bank. Start within 30 tiles of `(3102,3240,0)`. The first supported
-location contains normal **Tree** objects within 18 tiles of that centre; oaks,
+northwest of Draynor bank. Start within 30 tiles of `(3083,3265,0)`, preferably
+in the clearing near `(3083,3264)`. The first supported location contains normal
+**Tree** objects in the small rectangle x=3078–3086, z=3264–3273; oaks,
 willows, other banks, distant travel, quests and combat are outside this script.
 
 Use the library's search and category filter, select **Woodcutting**, then
@@ -43,13 +59,22 @@ the target to zero for a duration-only objective. The earlier of quantity or
 duration ends gathering. With banking enabled, remaining logs are deposited
 before completion. Without banking, a full inventory ends the run.
 
+Approach from the north, avoiding the jail to the east and wizards to the south.
+The script uses the bank's northern booth `(3091,3245)`. It excludes trees within
+six tiles of a visible jail guard/dark wizard and pauses if either comes within
+five tiles of the character. This is a conservative local guard, not a combat or
+escape script; travel and unusual NPC movement still require player attention.
+
 The script checks your usable axe and Woodcutting level. It checks native scene
 collision before selecting a tree, waits for actual logs and XP, avoids repeated
 clicks while gathering, and temporarily excludes failed targets. It waits up to
-one minute for reachable trees to respawn. Three unsuccessful actions pause for
+three minutes for reachable trees to respawn, preserving native regrowth times. Three unsuccessful actions pause for
 inspection. Doors, unexpected dialogue, random events, health loss and travel
 outside the supported area may require manual attention. Only native Woodcutting
-level-up continuations are handled automatically.
+level-up continuations are handled automatically. A late level-up dialogue
+interrupts pending gathering verification immediately, so the script can continue
+without waiting for an action timeout; it does not count the interrupted click
+as a successful log or a retry.
 
 Validated interactions and observed movement/XP progress refresh the native
 client's input-idle timer while the script runs. Paused or inactive automation
@@ -147,7 +172,13 @@ Add a built-in script with `defineBot`, a metadata/settings schema and a factory
 implementing `BotScript`; register it in `PersonalClientEntry.ts`. UI changes are
 not needed for another script's parameters. Script callbacks are synchronous and
 bounded. They call `ScriptContext.act` and wait for fresh observations, rather than
-creating timers or reaching into client internals.
+creating timers or reaching into client internals. An optional `onObservation`
+hook sees fresh state while an action is pending. It can use `interruptPending`
+when native state proves that action was interrupted; this records an interruption
+and preserves the distinction from verified success. Only one action may remain
+pending at a time.
+Optional manifest `skill` and `progressUnit` metadata select the sidebar's skill
+and counter labels; scripts without a quantity objective display their own status.
 
 `api/Types.ts` defines versioned observations and native actions. `R254Adapter`
 alone binds private r254 fields and dispatches through native `doAction`/`tryMove`.
@@ -170,11 +201,12 @@ Run from an assembled runtime with the overlay applied:
 
 ```sh
 cd webclient
-bun run build:personal
+bun run build
 node node_modules/typescript/lib/tsc.js --noEmit
 node --import ../engine/node_modules/tsx/dist/loader.mjs --test tests/personal-bot.test.ts
 cd ../engine
-node --import tsx --test tests/build-integrity.test.ts tests/bot-reliability.test.ts tests/bot-runtime.test.ts tests/bot-melee.test.ts tests/player-save.test.ts tests/persistence-runtime.test.ts
+node --import tsx tools/client/PublishWebclient.ts
+node --import tsx --test tests/build-integrity.test.ts tests/bot-reliability.test.ts tests/bot-runtime.test.ts tests/bot-melee.test.ts tests/player-save.test.ts tests/persistence-runtime.test.ts tests/webclient-deployment.test.ts
 ```
 
 The optional full browser suite requires Docker and separately installed
@@ -182,9 +214,30 @@ The optional full browser suite requires Docker and separately installed
 
 ```sh
 PERSONAL_BOT_RESULTS=/tmp/personal-controller-results.json \
+PERSONAL_BOT_FIXTURE="$PWD/tests/fixtures/personal-controller/draynor-banked.character.sav" \
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright-core/index.mjs \
 node tools/experiments/personal-controller-smoke.mjs
 ```
+
+The suite exports its disposable native save as `.character.sav` with a SHA-256
+and tutorial-history manifest beside it. A subsequent run can set
+`PERSONAL_BOT_FIXTURE=/tmp/personal-controller-results.json.character.sav` to reuse
+that earned character. The launcher checks the manifest, test account, native
+history and hash before copying it into the new isolated test database/profile.
+The world verifies its native save CRC before accepting login. The committed
+earned fixture is documented in `engine/tests/fixtures/personal-controller/README.md`.
+If the preceding run stopped during preparation, the setup completes the remaining
+tutorial tasks through native gameplay before starting mainland Woodcutting.
+Completion still requires the successful native spell and mainland transition.
+No existing personal save is discovered or used automatically.
+
+With the completed fixture, acceptance loads the actual published standard and
+optional bundles through ordinary HTTP requests, checks their hashes and the
+maps/notice, and registers no Playwright asset-substitution route. Native login
+uses the graphical screen and the normal welcome window. Without a completed
+fixture, the separate test-only driver prepares a fresh character through the
+native tutorial; that preparation mode alone is not production deployment
+acceptance. Export the earned save, then run the completed-fixture command above.
 
 The launcher retains PR #7's network-none container, read-only root, dropped
 capabilities, no-new-privileges and anonymous disposable volume. It copies code,
@@ -196,4 +249,8 @@ The gameplay driver finishes the actual Tutorial Island requirements via native
 actions before travelling to Draynor. The test world's read-only observer checks
 tutorial stages, population, timings and persistence; the product does not use it.
 
-Actual validation results are recorded below after the browser run completes.
+## Measured validation
+
+Production HTTP publication, native gameplay acceptance and regression results are
+recorded here once the current isolated run completes. Preparation artifacts and
+the earned native fixture are preserved independently of the test world.
