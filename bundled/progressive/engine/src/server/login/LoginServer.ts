@@ -158,14 +158,14 @@ export default class LoginServer {
         return false;
     }
 
-    constructor() {
-        if (Environment.LOGIN_SERVER && !Environment.EASY_STARTUP) {
+    constructor(options: { host?: string; management?: boolean } = {}) {
+        if (options.management !== false && Environment.LOGIN_SERVER && !Environment.EASY_STARTUP) {
             startManagementWeb();
         }
 
         InvType.load('data/pack');
 
-        this.server = new WebSocketServer({ port: Environment.LOGIN_PORT, host: '0.0.0.0' }, () => {
+        this.server = new WebSocketServer({ port: Environment.LOGIN_PORT, host: options.host ?? '0.0.0.0' }, () => {
             printInfo(`Login server listening on port ${Environment.LOGIN_PORT}`);
         });
 
