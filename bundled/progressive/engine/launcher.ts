@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import kleur from 'kleur';
+import { publishWebclient } from './tools/client/PublishWebclient.js';
 
 import { prepareGrandExchangeStage, restoreGrandExchangeStage } from './grand-exchange-stage.js';
 
@@ -427,15 +428,7 @@ async function buildWebClient() {
     }
 
     progress(92, 'Copying build output into engine/public/client');
-    const src = path.join(webclientDir, 'out', 'client.js');
-    const dest = path.join(__dirname, 'public', 'client', 'client.js');
-    if (!fs.existsSync(src)) {
-        console.log(`❌ Build output not found at ${src}`);
-        return;
-    }
-
-    fs.copyFileSync(src, dest);
-    console.log(`✅ Copied ${src} -> ${dest}`);
+    console.log(`✅ Published ${publishWebclient(__dirname).join(', ')}`);
 
     progress(100, 'Webclient build complete');
 }

@@ -291,6 +291,7 @@
             <a class="green" href="#" id="fullscreen" onclick="toggleFullscreen();">Go Fullscreen</a> |
             <a class="green" href="#" id="screenshot" onclick="saveScreenshot();">Take screenshot</a> |
             <a class="green" href="#" id="hide" onclick="hideControls();">Hide controls</a>
+            | <a class="green" href="?personalBot=1" id="personal-bot-link">Personal bot client</a>
         </div>
         <div id="hide-message" style="display: none;">
             <p class="green blink">Controls have been hidden press ctrl+alt+i to unhide.</p>
@@ -324,7 +325,13 @@
     </script>
 
     <script type="module">
-        import { Client } from './client/client.js?v=ge-search-live-hover-3';
+        const personalBotEnabled = new URLSearchParams(location.search).get('personalBot') === '1';
+        const { Client, namedClientFields } = await import(personalBotEnabled ? './client/personal-client.js?v=personal-v2' : './client/client.js?v=personal-deploy-v2');
+        const botLink = document.getElementById('personal-bot-link');
+        const botUrl = new URL(location.href);
+        if (personalBotEnabled) botUrl.searchParams.delete('personalBot'); else botUrl.searchParams.set('personalBot', '1');
+        botLink.href = botUrl.href;
+        botLink.textContent = personalBotEnabled ? 'Standard client' : 'Personal bot client';
 
         // Temporary runtime diagnostics: surface fatal async client-loop failures on-page.
         const runtimeDiagnostic = document.createElement('pre');
@@ -348,15 +355,21 @@
             showRuntimeDiagnostic('unhandled rejection', event.reason);
         });
 
+        // Older installations can still serve the original property-mangled bundle.
+        const nativeNames = namedClientFields === true || personalBotEnabled;
+        const field = Object.fromEntries(Object.entries({
+            mouseDown: 'pd', pointerDown: 'qd', mouseUp: 'rd', pointerUp: 'sd',
+            pointerMove: 'vd', pointerLeave: 'ud', orbitCameraYaw: 'tw',
+            orbitCameraPitch: 'sw', orbitCameraYawVelocity: 'uw', orbitCameraPitchVelocity: 'ww',
+            redrawFrame: 'bw', keyHeld: 'Vc', ingame: 'BC', nextMouseClickX: 'Oc',
+            nextMouseClickY: 'Pc', nextMouseClickButton: 'Nc', mouseButton: 'Kc'
+        }).map(([name, alias]) => [name, nativeNames ? name : alias]));
         function resetCompassAndCamera(client) {
-            client.tw = 0;
-            client.uw = 0;
-            client.ww = 0;
-            client.bw = true;
-            client.Vc[1] = 0;
-            client.Vc[2] = 0;
-            client.Vc[3] = 0;
-            client.Vc[4] = 0;
+            client[field.orbitCameraYaw] = 0;
+            client[field.orbitCameraYawVelocity] = 0;
+            client[field.orbitCameraPitchVelocity] = 0;
+            client[field.redrawFrame] = true;
+            client[field.keyHeld].fill(0, 1, 5);
         }
 
         const customContent = window.__customContent ?? {};
@@ -378,14 +391,14 @@
             return true;
         }
 
-        const originalMouseDown = Client.prototype.pd;
-        Client.prototype.pd = function (x, y, event) {
+        const originalMouseDown = Client.prototype[field.mouseDown];
+        Client.prototype[field.mouseDown] = function (x, y, event) {
             if (isCompassClick(this, x, y)) {
                 resetCompassAndCamera(this);
-                this.Oc = -1;
-                this.Pc = -1;
-                this.Nc = 0;
-                this.Kc = 0;
+                this[field.nextMouseClickX] = -1;
+                this[field.nextMouseClickY] = -1;
+                this[field.nextMouseClickButton] = 0;
+                this[field.mouseButton] = 0;
                 event?.preventDefault();
                 return;
             }
@@ -393,14 +406,14 @@
             return originalMouseDown.call(this, x, y, event);
         };
 
-        const originalPointerDown = Client.prototype.qd;
-        Client.prototype.qd = function (x, y, event) {
+        const originalPointerDown = Client.prototype[field.pointerDown];
+        Client.prototype[field.pointerDown] = function (x, y, event) {
             if (isCompassClick(this, x, y)) {
                 resetCompassAndCamera(this);
-                this.Oc = -1;
-                this.Pc = -1;
-                this.Nc = 0;
-                this.Kc = 0;
+                this[field.nextMouseClickX] = -1;
+                this[field.nextMouseClickY] = -1;
+                this[field.nextMouseClickButton] = 0;
+                this[field.mouseButton] = 0;
                 event?.preventDefault();
                 return;
             }
@@ -408,14 +421,14 @@
             return originalPointerDown.call(this, x, y, event);
         };
 
-        const originalMouseUp = Client.prototype.rd;
-        Client.prototype.rd = function (x, y, event) {
+        const originalMouseUp = Client.prototype[field.mouseUp];
+        Client.prototype[field.mouseUp] = function (x, y, event) {
             if (isCompassClick(this, x, y)) {
                 resetCompassAndCamera(this);
-                this.Oc = -1;
-                this.Pc = -1;
-                this.Nc = 0;
-                this.Kc = 0;
+                this[field.nextMouseClickX] = -1;
+                this[field.nextMouseClickY] = -1;
+                this[field.nextMouseClickButton] = 0;
+                this[field.mouseButton] = 0;
                 event?.preventDefault();
                 return;
             }
@@ -423,14 +436,14 @@
             return originalMouseUp.call(this, x, y, event);
         };
 
-        const originalPointerUp = Client.prototype.sd;
-        Client.prototype.sd = function (x, y, event) {
+        const originalPointerUp = Client.prototype[field.pointerUp];
+        Client.prototype[field.pointerUp] = function (x, y, event) {
             if (isCompassClick(this, x, y)) {
                 resetCompassAndCamera(this);
-                this.Oc = -1;
-                this.Pc = -1;
-                this.Nc = 0;
-                this.Kc = 0;
+                this[field.nextMouseClickX] = -1;
+                this[field.nextMouseClickY] = -1;
+                this[field.nextMouseClickButton] = 0;
+                this[field.mouseButton] = 0;
                 event?.preventDefault();
                 return;
             }
@@ -438,8 +451,8 @@
             return originalPointerUp.call(this, x, y, event);
         };
 
-        const originalPointerMove = Client.prototype.vd;
-        Client.prototype.vd = function (x, y, event) {
+        const originalPointerMove = Client.prototype[field.pointerMove];
+        Client.prototype[field.pointerMove] = function (x, y, event) {
             const previousScreenX = this.mobileRotateX;
             const previousScreenY = this.mobileRotateY;
 
@@ -450,31 +463,31 @@
 
             const result = originalPointerMove.call(this, x, y, event);
 
-            if (middleMouseRotationEnabled && event?.pointerType && event.pointerType !== 'mouse' && this.BC && (this.Vc[1] || this.Vc[2] || this.Vc[3] || this.Vc[4])) {
+            if (middleMouseRotationEnabled && event?.pointerType && event.pointerType !== 'mouse' && this[field.ingame] && (this[field.keyHeld][1] || this[field.keyHeld][2] || this[field.keyHeld][3] || this[field.keyHeld][4])) {
                 if (Number.isFinite(previousScreenX) && Number.isFinite(previousScreenY)) {
                     const dx = event.screenX - previousScreenX;
                     const dy = event.screenY - previousScreenY;
                     const yawDelta = Math.round(dx * 2);
                     const pitchDelta = Math.round(dy * 0.75);
-                    this.tw = (this.tw - yawDelta) & 2047;
-                    this.sw = Math.max(128, Math.min(383, this.sw + pitchDelta));
-                    this.bw = true;
+                    this[field.orbitCameraYaw] = (this[field.orbitCameraYaw] - yawDelta) & 2047;
+                    this[field.orbitCameraPitch] = Math.max(128, Math.min(383, this[field.orbitCameraPitch] + pitchDelta));
+                    this[field.redrawFrame] = true;
                     this.northLock = 0;
                 }
 
-                this.ww = 0;
-                this.uw = 0;
-                this.Vc[1] = 0;
-                this.Vc[2] = 0;
-                this.Vc[3] = 0;
-                this.Vc[4] = 0;
+                this[field.orbitCameraPitchVelocity] = 0;
+                this[field.orbitCameraYawVelocity] = 0;
+                this[field.keyHeld][1] = 0;
+                this[field.keyHeld][2] = 0;
+                this[field.keyHeld][3] = 0;
+                this[field.keyHeld][4] = 0;
             }
 
             return result;
         };
 
-        const originalPointerLeave = Client.prototype.ud;
-        Client.prototype.ud = function (event) {
+        const originalPointerLeave = Client.prototype[field.pointerLeave];
+        Client.prototype[field.pointerLeave] = function (event) {
             this.mobileRotateX = undefined;
             this.mobileRotateY = undefined;
             return originalPointerLeave.call(this, event);

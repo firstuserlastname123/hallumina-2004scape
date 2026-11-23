@@ -1,0 +1,210 @@
+{
+  "schema": "hallumina-personal-controller-validation-v1",
+  "sourceCommit": "50c03fd",
+  "revision": 254,
+  "tickMs": 600,
+  "xpRate": 1,
+  "runtime": {
+    "node": "v24.22.3",
+    "controllerInheritedEngineDebug": "true",
+    "chromium": "156.0.8078.79"
+  },
+  "fixtureSha256": "e66f18cc93225a1667a880d55e96ba92a5152c0beda9dbba8793706294515047",
+  "productionAssets": {
+    "substitutedAssets": false,
+    "assets": [
+      {
+        "name": "client.js",
+        "bytes": 482278,
+        "sha256": "eebbccb7884f6cb47637cddc3dd3e449dfa4a6b0c18bfb0ea237b7869b3c7712"
+      },
+      {
+        "name": "client.js.map",
+        "bytes": 2191755,
+        "sha256": "c3c0c1713d73cc5178a76d190e22218bcafeba872be5113a9d2034f0efac2ad2"
+      },
+      {
+        "name": "personal-client.js",
+        "bytes": 517678,
+        "sha256": "d94fe452d52e7069e04fcb12941a252a735fa781d5d12b94f5d5558c17a1e6fe"
+      },
+      {
+        "name": "personal-client.js.map",
+        "bytes": 2300495,
+        "sha256": "262c78e856030b0cfdf64ac594b52a204078889509d0ff705ae7d9d596c44289"
+      },
+      {
+        "name": "personal-client.NOTICE.txt",
+        "bytes": 1513,
+        "sha256": "bbc6239b85ac69d19d93cbf0d65aa3a2024cc8db17fab1b16776ae22d9a238c4"
+      }
+    ]
+  },
+  "nativeWoodcutting": {
+    "completed": true,
+    "progress": {
+      "gathered": 24,
+      "banked": 24,
+      "cycles": 3,
+      "elapsed": 461777
+    },
+    "initialXp": 775,
+    "finalXp": 1375,
+    "health": 10,
+    "protectedItemsPreserved": true,
+    "deposits": [
+      {
+        "before": {
+          "at": 1795469830952,
+          "inventory": 10,
+          "bank": 30,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3245,
+            "level": 0
+          }
+        },
+        "after": {
+          "at": 1795469831179,
+          "inventory": 0,
+          "bank": 40,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3245,
+            "level": 0
+          }
+        }
+      },
+      {
+        "before": {
+          "at": 1795470025324,
+          "inventory": 10,
+          "bank": 40,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3246,
+            "level": 0
+          }
+        },
+        "after": {
+          "at": 1795470025553,
+          "inventory": 0,
+          "bank": 50,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3245,
+            "level": 0
+          }
+        }
+      },
+      {
+        "before": {
+          "at": 1795470115287,
+          "inventory": 4,
+          "bank": 50,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3245,
+            "level": 0
+          }
+        },
+        "after": {
+          "at": 1795470115514,
+          "inventory": 0,
+          "bank": 54,
+          "axe": true,
+          "position": {
+            "x": 3092,
+            "z": 3245,
+            "level": 0
+          }
+        }
+      }
+    ],
+    "confirmedBankLogs": 54,
+    "failedActionCount": 1
+  },
+  "controls": {
+    "manualHandover": true,
+    "recordingWhileIdle": true,
+    "reconnect": {
+      "explicitResumeRequired": true,
+      "stopped": true
+    },
+    "objectiveRecovery": {
+      "explicitReviewAndStart": true,
+      "bankedUnchanged": true,
+      "stopped": true
+    },
+    "standardClient": {
+      "panelAbsent": true,
+      "nativeLogin": true,
+      "nativeMovement": true
+    },
+    "diagnostics": {
+      "downloaded": true,
+      "terminalResults": 42,
+      "logs": 73
+    },
+    "recording": {
+      "events": 373,
+      "dropped": 54,
+      "bounded": true
+    }
+  },
+  "coexistence": {
+    "managedBots": 100,
+    "minimumManagedBots": 100,
+    "ticksWithBothOrdinaryPlayers": 832
+  },
+  "performance": {
+    "worldProcess": {
+      "wallMs": 547188.46084,
+      "cpuUserMs": 50874.558,
+      "cpuSystemMs": 2933.975,
+      "rssBytes": 803672064
+    },
+    "averageWorldCpuPercentOfOneCore": 9.83,
+    "tickWorkMs": {
+      "ticks": 899,
+      "mean": 38.33432200778611,
+      "p95": 69.3446760000079,
+      "max": 527.9397909999825,
+      "over600": 0
+    },
+    "settledTickWorkMs": {
+      "ticks": 823,
+      "mean": 36.73272920899119,
+      "p95": 63.29760300001362,
+      "max": 527.9397909999825,
+      "over600": 0
+    }
+  },
+  "integrity": {
+    "saveCrcs": 102,
+    "sqlite": {
+      "quickCheck": {
+        "quick_check": "ok"
+      },
+      "accounts": {
+        "count": 102
+      }
+    },
+    "javascriptErrors": [],
+    "originalRuntimeUnchanged": true,
+    "networkMode": "none",
+    "readOnlyRootfs": true
+  },
+  "checks": {
+    "controllerTests": 20,
+    "publicationTests": 2,
+    "existingRegressionTests": 49,
+    "webclientTypecheck": true,
+    "productionBuild": true
+  }
+}

@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { publishWebclient } from './tools/client/PublishWebclient.js';
 
 const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_DIR = path.join(ENGINE_DIR, '..');
@@ -250,8 +251,7 @@ export async function prepareGrandExchangeWebClientStage() {
         throw new Error('Grand Exchange webclient bundle does not contain the native-inventory Sell action');
     }
 
-    fs.mkdirSync(path.dirname(PUBLIC_CLIENT_PATH), { recursive: true });
-    fs.copyFileSync(BUILD_OUTPUT_PATH, PUBLIC_CLIENT_PATH);
+    publishWebclient(ENGINE_DIR);
 
     const publishedClient = fs.readFileSync(PUBLIC_CLIENT_PATH, 'utf8');
     if (!publishedClient.includes('Collect')) {

@@ -41,11 +41,16 @@ async function bunBuild(entry: string, external: string[] = [], minify = true, d
     };
 }
 
-async function applyTerser(script: BunOutput): Promise<boolean> {
+async function applyTerser(script: BunOutput, mangleProperties = true, output = 'client.js'): Promise<boolean> {
     const mini = await minify(script.source, {
         sourceMap: {
-            content: script.sourcemap
+            content: script.sourcemap,
+            filename: output,
+            url: `${output}.map`
         },
+        format: output === 'personal-client.js' ? {
+            preamble: '/*! Includes MIT-licensed rs2b0t adaptations. Copyright (c) 2026 N64Jive. See personal-client.NOTICE.txt. */'
+        } : {},
         toplevel: true,
         // format: {
         //     beautify: true
@@ -55,7 +60,7 @@ async function applyTerser(script: BunOutput): Promise<boolean> {
         },
         mangle: {
             nth_identifier: nth_identifier,
-            properties: {
+            properties: mangleProperties ? {
                 reserved: [
                     // custom content flags set via inline (non-bundled) HTML script in view/client.ejs —
                     // must keep literal names or CUSTOM_CONTENT?.clans lookups break after mangling
@@ -120,7 +125,7 @@ async function applyTerser(script: BunOutput): Promise<boolean> {
                     'getValue',
                     'calledRun'
                 ]
-            }
+            } : false
         }
     });
 
@@ -142,17 +147,23 @@ const prod = args[0] !== 'dev';
 
 const entrypoints = [
     { file: 'src/client/ClientEntry.ts', output: 'client.js' },
+    { file: 'src/bot/PersonalClientEntry.ts', output: 'personal-client.js' },
     { file: 'src/mapview/MapView.ts', output: 'mapview.js' }
 ];
 
 for (const { file, output } of entrypoints) {
+    if (args.includes('personal') && output !== 'personal-client.js') continue;
     const script = await bunBuild(file, [], prod, prod ? ['console'] : []);
     if (script) {
         if (prod) {
-            await applyTerser(script);
+            // Both game bundles share native page input hooks. Stable property names
+            // avoid coupling the HTML to Terser's build-dependent property aliases.
+            await applyTerser(script, output === 'mapview.js', output);
         }
 
         fs.writeFileSync(`out/${output}`, script.source);
         fs.writeFileSync(`out/${output}.map`, script.sourcemap);
     }
 }
+
+fs.copyFileSync('src/bot/NOTICE', 'out/personal-client.NOTICE.txt');
