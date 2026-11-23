@@ -41,7 +41,7 @@ async function bunBuild(entry: string, external: string[] = [], minify = true, d
     };
 }
 
-async function applyTerser(script: BunOutput): Promise<boolean> {
+async function applyTerser(script: BunOutput, mangleProperties = true): Promise<boolean> {
     const mini = await minify(script.source, {
         sourceMap: {
             content: script.sourcemap
@@ -55,7 +55,7 @@ async function applyTerser(script: BunOutput): Promise<boolean> {
         },
         mangle: {
             nth_identifier: nth_identifier,
-            properties: {
+            properties: mangleProperties ? {
                 reserved: [
                     // custom content flags set via inline (non-bundled) HTML script in view/client.ejs —
                     // must keep literal names or CUSTOM_CONTENT?.clans lookups break after mangling
@@ -120,7 +120,7 @@ async function applyTerser(script: BunOutput): Promise<boolean> {
                     'getValue',
                     'calledRun'
                 ]
-            }
+            } : false
         }
     });
 
@@ -142,17 +142,23 @@ const prod = args[0] !== 'dev';
 
 const entrypoints = [
     { file: 'src/client/ClientEntry.ts', output: 'client.js' },
+    { file: 'src/bot/PersonalClientEntry.ts', output: 'personal-client.js' },
     { file: 'src/mapview/MapView.ts', output: 'mapview.js' }
 ];
 
 for (const { file, output } of entrypoints) {
+    if (args.includes('personal') && output !== 'personal-client.js') continue;
     const script = await bunBuild(file, [], prod, prod ? ['console'] : []);
     if (script) {
         if (prod) {
-            await applyTerser(script);
+            // The optional bundle exports versioned JSON contracts and uses typed native
+            // field bindings. Keep their names stable; ordinary client packaging is unchanged.
+            await applyTerser(script, output !== 'personal-client.js');
         }
 
         fs.writeFileSync(`out/${output}`, script.source);
         fs.writeFileSync(`out/${output}.map`, script.sourcemap);
     }
 }
+
+fs.copyFileSync('src/bot/NOTICE', 'out/personal-client.NOTICE.txt');

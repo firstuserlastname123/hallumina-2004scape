@@ -291,6 +291,7 @@
             <a class="green" href="#" id="fullscreen" onclick="toggleFullscreen();">Go Fullscreen</a> |
             <a class="green" href="#" id="screenshot" onclick="saveScreenshot();">Take screenshot</a> |
             <a class="green" href="#" id="hide" onclick="hideControls();">Hide controls</a>
+            | <a class="green" href="?personalBot=1" id="personal-bot-link">Personal bot client</a>
         </div>
         <div id="hide-message" style="display: none;">
             <p class="green blink">Controls have been hidden press ctrl+alt+i to unhide.</p>
@@ -324,7 +325,13 @@
     </script>
 
     <script type="module">
-        import { Client } from './client/client.js?v=ge-search-live-hover-3';
+        const personalBotEnabled = new URLSearchParams(location.search).get('personalBot') === '1';
+        const { Client } = await import(personalBotEnabled ? './client/personal-client.js?v=personal-v1' : './client/client.js?v=ge-search-live-hover-3');
+        const botLink = document.getElementById('personal-bot-link');
+        const botUrl = new URL(location.href);
+        if (personalBotEnabled) botUrl.searchParams.delete('personalBot'); else botUrl.searchParams.set('personalBot', '1');
+        botLink.href = botUrl.href;
+        botLink.textContent = personalBotEnabled ? 'Standard client' : 'Personal bot client';
 
         // Temporary runtime diagnostics: surface fatal async client-loop failures on-page.
         const runtimeDiagnostic = document.createElement('pre');
@@ -349,6 +356,14 @@
         });
 
         function resetCompassAndCamera(client) {
+            if (personalBotEnabled) {
+                client.orbitCameraYaw = 0;
+                client.orbitCameraYawVelocity = 0;
+                client.orbitCameraPitchVelocity = 0;
+                client.redrawFrame = true;
+                client.keyHeld.fill(0, 1, 5);
+                return;
+            }
             client.tw = 0;
             client.uw = 0;
             client.ww = 0;
@@ -378,6 +393,9 @@
             return true;
         }
 
+        // The stock published bundle uses historical property aliases. The optional
+        // bundle keeps native field names stable for its revision-specific adapter.
+        if (!personalBotEnabled) {
         const originalMouseDown = Client.prototype.pd;
         Client.prototype.pd = function (x, y, event) {
             if (isCompassClick(this, x, y)) {
@@ -479,6 +497,7 @@
             this.mobileRotateY = undefined;
             return originalPointerLeave.call(this, event);
         };
+        }
 
         (() => {
             const client = new Client(<%= nodeid %>, <%= lowmem %>, <%= members %>);

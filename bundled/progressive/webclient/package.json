@@ -8,6 +8,7 @@
     },
     "scripts": {
         "build": "bun run bundle.ts",
+        "build:personal": "bun run bundle.ts personal",
         "build:dev": "bun run bundle.ts dev"
     },
     "dependencies": {

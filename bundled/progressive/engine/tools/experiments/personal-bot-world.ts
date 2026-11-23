@@ -34,6 +34,8 @@ const loginServer = new LoginServer({ host: '127.0.0.1', management: false });
 const listener = (loginServer as unknown as { server: import('ws').WebSocketServer }).server;
 if (!listener.address()) await once(listener, 'listening');
 const durations: number[] = [];
+const processStarted = performance.now();
+const cpuStarted = process.cpuUsage();
 const settledDurations: number[] = [];
 const bindings: { role: string; address: string; family: string; port: number }[] = [];
 let minBots = 100, coexistTicks = 0, stopping = false;
@@ -52,16 +54,19 @@ World.cycle = () => {
         if (bots === 100 && human && personal) {
             coexistTicks++;
             if (coexistTicks >= 10 && Number(human.getVar(VarPlayerType.getId('tutorial'))) >= 1 &&
-                personal.getVar(VarPlayerType.getId('tutorial')) === 40) settledDurations.push(duration);
+                personal.getVar(VarPlayerType.getId('tutorial')) >= 40) settledDurations.push(duration);
         }
     }
 };
 function observe() {
+    const cpu = process.cpuUsage(cpuStarted);
     const players = [...World.playerLoop.all()];
     const sorted = durations.slice(5).sort((a, b) => a - b);
     const settled = settledDurations.slice().sort((a, b) => a - b);
     return {
         revision: Environment.ENGINE_REVISION, tick: World.currentTick, minBots, coexistTicks,
+        clientRoutefinder: Environment.NODE_CLIENT_ROUTEFINDER,
+        process: { wallMs: performance.now() - processStarted, cpuUserMs: cpu.user / 1000, cpuSystemMs: cpu.system / 1000, rssBytes: process.memoryUsage().rss },
         listeners: bindings, engineDebug: Environment.NODE_DEBUG, managedBotDebug: Environment.BOT_DEBUG_ENABLED,
         bots: players.filter(p => p.is_bot).length,
         timing: { ticks: sorted.length, mean: sorted.reduce((a, b) => a + b, 0) / (sorted.length || 1),
@@ -71,7 +76,8 @@ function observe() {
         players: players.filter(p => /^pr7(bot|human)$/.test(p.username)).map(p => ({
             name: p.username, isBot: p.is_bot, position: { x: p.x, z: p.z, level: p.level },
             xp: [...p.stats], tutorial: p.getVar(VarPlayerType.getId('tutorial')),
-            inventory: p.getInventory(InvType.INV)!.items.map(item => item && { id: item.id, count: item.count })
+            inventory: p.getInventory(InvType.INV)!.items.map(item => item && { id: item.id, count: item.count }),
+            bank: p.invs.get(InvType.getId('bank'))?.items.filter(Boolean).map(item => item && { id: item.id, count: item.count })
         }))
     };
 }

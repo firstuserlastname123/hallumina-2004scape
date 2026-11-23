@@ -43,7 +43,8 @@ export function checkContainerIsolation() {
     return { rootReadOnly: true, networkInterfaces: ['lo'], originalRuntimeVisible: false, rootWriteRejected: 'EROFS' };
 }
 
-export async function runInContainer(engine, resultPath) {
+export async function runInContainer(engine, resultPath, suite = 'personal-bot-smoke.mjs') {
+    assert.ok(['personal-bot-smoke.mjs', 'personal-controller-smoke.mjs'].includes(suite));
     assert.ok(path.isAbsolute(resultPath));
     const runtime = fs.realpathSync(path.resolve(engine, '..'));
     const output = path.join(fs.realpathSync(path.dirname(resultPath)), path.basename(resultPath));
@@ -94,7 +95,7 @@ export async function runInContainer(engine, resultPath) {
             '-e', 'PERSONAL_BOT_RESULTS=/experiment/results.json', '-e', 'PLAYWRIGHT_MODULE=/experiment/playwright-core/index.mjs',
             // Exercise the explicit world override even when engine debugging is inherited.
             '-e', `NODE_DEBUG=${process.env.NODE_DEBUG ?? 'true'}`,
-            image, 'tools/experiments/personal-bot-smoke.mjs']);
+            image, `tools/experiments/${suite}`]);
         const configuration = JSON.parse(await docker(['inspect', container]))[0];
         assert.equal(configuration.HostConfig.ReadonlyRootfs, true);
         assert.equal(configuration.HostConfig.NetworkMode, 'none');
@@ -112,6 +113,11 @@ export async function runInContainer(engine, resultPath) {
         try {
             await docker(['cp', `${container}:/experiment/results.json`, resultPath]);
             await docker(['cp', `${container}:/experiment/results.json.world.log`, `${resultPath}.world.log`]);
+            if (suite === 'personal-controller-smoke.mjs') {
+                for (const suffix of ['.png', '.events.json']) {
+                    try { await docker(['cp', `${container}:/experiment/results.json${suffix}`, `${resultPath}${suffix}`]); } catch { /* Optional failure artifacts. */ }
+                }
+            }
         } catch (error) { throw startError || error; }
         const results = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
         const after = Object.fromEntries(protectedPaths.map(name => [name, digestTree(path.join(runtime, name))]));
