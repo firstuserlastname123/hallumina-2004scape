@@ -36,6 +36,7 @@ export class R254Adapter implements GamePort {
     private last: Observation | null = null;
     private automated = false;
     private actionDepth = 0;
+    private activity: { account: string; xp: number[]; tile: Tile | null } | null = null;
     private readonly listeners = new Set<(action: Record<string, unknown>) => void>();
     private readonly originalAction: NativeState['doAction'];
     private readonly originalMove: NativeState['tryMove'];
@@ -81,6 +82,16 @@ export class R254Adapter implements GamePort {
     }
     onManualCommand(listener: (action: Record<string, unknown>) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
     dispose(): void { this.c.doAction = this.originalAction; this.c.tryMove = this.originalMove; this.listeners.clear(); }
+    acknowledgeActivity(sequence: number, account: string): void {
+        const s = this.last;
+        if (!s?.ready || s.sequence !== sequence || s.account !== account || Date.now() - s.at > 1500) return;
+        const previous = this.activity;
+        if (previous?.account === account && (s.skills.some((skill, i) => skill.xp > (previous.xp[i] ?? skill.xp)) ||
+            (s.position && previous.tile && (s.position.x !== previous.tile.x || s.position.z !== previous.tile.z || s.position.level !== previous.tile.level)))) {
+            this.c.idleTimer = performance.now();
+        }
+        this.activity = { account, xp: s.skills.map(skill => skill.xp), tile: s.position };
+    }
     private components(): IfType[] {
         const ids = new Set<number>();
         const visit = (id: number): void => {

@@ -81,6 +81,12 @@ test('pause obtains a fresh cancellation observation even after another observer
     assert.equal(cancellation.action.kind, 'walk'); assert.equal(cancellation.sequence, game.s.sequence);
     assert.equal(runner.state, 'paused');
 });
+test('native activity acknowledgement stops when control is paused', () => {
+    const { game, runner } = fixture(); let acknowledgements = 0;
+    Object.assign(game, { acknowledgeActivity: () => { acknowledgements++; } });
+    runner.start(woodcutting, {}); runner.pump(); assert.equal(acknowledgements, 1);
+    runner.pause(); runner.pump(); runner.pump(); assert.equal(acknowledgements, 1);
+});
 test('logout/account switch requires explicit resume by original account', () => {
     const { game, runner } = fixture(); runner.start(woodcutting, {}); game.s.ready = false; runner.pump(); assert.equal(runner.state, 'paused');
     game.s.ready = true; game.s.account = 'someoneelse'; assert.throws(() => runner.resume());
@@ -106,6 +112,11 @@ test('missing axe, protected full inventory and unavailable trees fail safely', 
     const g = fixture(); g.game.s.inventory = Array.from({ length: 28 }, (_, i) => ({ ...g.game.s.inventory[0], slot: i }));
     g.runner.start(woodcutting, {}); g.runner.pump(); assert.equal(g.runner.state, 'paused');
     const h = fixture(); h.game.s.objects = []; h.runner.start(woodcutting, {}); h.runner.pump(); assert.equal(h.game.requests.length, 0); assert.match(h.runner.status, /respawn/);
+});
+test('black axes use the native r254 Woodcutting level requirement', () => {
+    const { game, runner } = fixture(); game.s.inventory[0].id = 1361; game.s.skills[8].level = 6;
+    runner.start(woodcutting, {}); assert.equal(runner.state, 'error');
+    game.s.skills[8].level = 11; runner.start(woodcutting, {}); assert.equal(runner.state, 'running');
 });
 test('bounded failures pause rather than looping forever', () => {
     const { game, runner } = fixture(); game.accept = false; runner.start(woodcutting, {});

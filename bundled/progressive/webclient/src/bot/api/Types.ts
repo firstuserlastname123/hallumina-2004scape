@@ -26,6 +26,8 @@ export interface GamePort {
     /** Returns a reachable approach tile using native scene collision, without issuing a click. */
     approach(target: Tile, width?: number, length?: number): Tile | null;
     dispatch(request: ActionRequest): { accepted: boolean; reason: string };
+    /** Reflect observed progress in a native input-idle clock while the runner owns control. */
+    acknowledgeActivity?(sequence: number, account: string): void;
     onManualCommand(listener: (action: Record<string, unknown>) => void): () => void;
     dispose(): void;
 }

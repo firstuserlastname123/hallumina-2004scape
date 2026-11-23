@@ -90,7 +90,7 @@ export async function finishTutorial(page, results, ids, readStage) {
             case 279: case 280: await npc('Mining Instructor'); break;
             case 290: case 295: await object(ids.newbiecopperrock, 'Mine'); break;
             case 294: await object(ids.newbietinrock, 'Mine'); break;
-            case 320: await useObject('Copper ore', 'Furnace'); break;
+            case 320: await useObject('Copper ore', ids.newbiefurnace); break;
             case 330: await npc('Mining Instructor'); break;
             case 340:
                 if (s.main !== -1) await command({ kind: 'smith', id: 1205, slot: 0, component: 1119 });

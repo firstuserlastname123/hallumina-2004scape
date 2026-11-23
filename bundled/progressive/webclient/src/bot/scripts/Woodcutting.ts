@@ -4,7 +4,8 @@ import { distance, total } from '../api/Types.js';
 import { defineBot } from '../runtime/defineBot.js';
 
 const LOGS = 1511, CENTRE: Tile = { x: 3102, z: 3240, level: 0 };
-const AXES = new Map([[1351, 1], [1349, 1], [1353, 6], [1355, 21], [1357, 31], [1359, 41], [1361, 6]]);
+// Native r254 skill_woodcutting/configs/axes/axes.obj requirements (not upstream bot catalogs).
+const AXES = new Map([[1351, 1], [1349, 1], [1353, 6], [1355, 21], [1357, 31], [1359, 41], [1361, 11]]);
 export const woodcutting = defineBot({
     id: 'woodcutting', name: 'Woodcutting', version: '1.0.0', category: 'Skills', tags: ['gathering', 'logs', 'banking'],
     description: 'Chop normal trees near Draynor bank. Bank logs through the native bank interface and keep your axe.',

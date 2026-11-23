@@ -77,6 +77,7 @@ export class ScriptRunner {
             if (this.previousPump && now - this.previousPump > 5000) { this.pause('Browser suspended; inspect the character and Resume'); return; }
             if (!s.ready || s.account !== this.account) { this.pause('Connection or scene changed; inspect and Resume'); return; }
             if (previous?.ready && s.health < previous.health) { this.pause('Health decreased; player attention required'); return; }
+            this.game.acknowledgeActivity?.(s.sequence, this.account!);
             this.progress.elapsed += Math.max(0, now - this.previousPump); this.previousPump = now;
             const pending = this.pendingAction;
             if (pending) {

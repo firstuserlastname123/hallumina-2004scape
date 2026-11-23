@@ -51,6 +51,10 @@ inspection. Doors, unexpected dialogue, random events, health loss and travel
 outside the supported area may require manual attention. Only native Woodcutting
 level-up continuations are handled automatically.
 
+Validated interactions and observed movement/XP progress refresh the native
+client's input-idle timer while the script runs. Paused or inactive automation
+does not keep the character logged in indefinitely.
+
 Banking uses a reachable Draynor booth's **Use-quickly** option, the actual bank
 interface, and its **Deposit All** operation for normal logs (1511). A deposit is
 verified only when logs decrease in inventory and increase in the open bank.
