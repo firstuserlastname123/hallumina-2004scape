@@ -251,6 +251,56 @@ tutorial stages, population, timings and persistence; the product does not use i
 
 ## Measured validation
 
-Production HTTP publication, native gameplay acceptance and regression results are
-recorded here once the current isolated run completes. Preparation artifacts and
-the earned native fixture are preserved independently of the test world.
+Validated on 2026-11-23 against source commit `50c03fd` and the exact published
+production asset hashes in [the validation report](validation/personal-controller-r254.json).
+Both game bundles, maps and MIT notice returned HTTP 200 with matching bytes;
+no Playwright asset substitution or test-driver bundle was used.
+
+| Check | Actual result |
+| --- | --- |
+| Native Woodcutting objective | 24 new logs, 600 XP; completed in 461.8 active seconds |
+| Native deposits | 3 verified deposits; inventory reductions matched bank increases |
+| Bank contents | 30 → 54 logs, independently confirmed by the read-only native world observer |
+| Protected items | Bronze axe and all initial inventory/equipment preserved; final HP 10 |
+| Action failures | 1 blocked/timed-out actions; level-up interruptions remained distinct from success |
+| Controls | Graphical Start/Pause/Resume/Stop, manual handover, logout/reconnect, explicit reload recovery passed |
+| Ordinary client | Native login, character design and manual movement; optional panel absent |
+| Managed population | Minimum 100; 832 ticks with both ordinary players present |
+| Event export | Actual JSON download, 373 retained events; 54 older events discarded by the bound |
+| Diagnostic export | Actual JSON download, completed goal and typed terminal results verified |
+| Save/database integrity | 102 native save CRCs valid; SQLite quick_check = ok; source persistence unchanged |
+| JavaScript runtime errors | 0 |
+| Controller/publication tests | 20 + 2 passed |
+| Existing r254, playerbot, navigation, melee and persistence regressions | 49 passed |
+| Typecheck/production build | Passed |
+
+World tick **work duration** after the first five ticks averaged
+38.33 ms, p95 69.34 ms, maximum
+527.94 ms; 0 samples exceeded the normal
+600 ms tick budget. With both ordinary players settled, p95 was
+63.30 ms. The world process averaged 9.83% of one CPU core
+including startup and ended at 766.4 MiB RSS. These
+figures describe this isolated run; browser CPU is separate.
+
+The starting character had legitimately earned its earlier bank contents. Only
+newly received logs and XP counted toward this objective. Native deposits and
+returns to gathering completed repeatedly; after reconnect/reload, the existing
+bank contents were not replayed as a transaction. The committed earned fixtures
+retain the original tutorial history and raw save hashes. No tutorial progression,
+items, XP or character bytes were fabricated or edited.
+
+Unit coverage additionally exercises unreachable trees, missing/unusable axes,
+protected full inventories, incomplete bank confirmations, bounded retries,
+timeouts, tab suspension, health loss and lost deposit acknowledgements. Those
+forced failure cases are unit tests; the sustained run uses actual native gameplay.
+Travel preparation, lifecycle checks and the world observer are test tooling and
+are absent from the production bundle. The test container exposes no host ports
+and has no live database/save mounts.
+
+The first activity remains limited to this Draynor clearing and northern booth.
+Long-distance travel, random events, unexpected dialogues, nearby hazards and
+closed doors can require manual attention. The tab must stay open and active;
+background/suspended execution requires explicit Resume. Broader skills, quests,
+combat, external transport and Strata integration remain future work.
+
+![Completed native Woodcutting objective](validation/personal-controller-r254.png)
